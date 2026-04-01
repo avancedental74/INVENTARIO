@@ -46,6 +46,7 @@
     --mono: 'DM Mono', monospace;
     --nav-h: 64px;
     --bottom-h: 72px;
+    --bottom-h: max(72px, calc(60px + env(safe-area-inset-bottom)));
     --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
   }
   [data-theme="dark"] {
@@ -70,7 +71,7 @@
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { height: 100%; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; height: -webkit-fill-available; -webkit-tap-highlight-color: transparent; }
   body {
     font-family: var(--font);
     background: var(--bg);
@@ -83,7 +84,7 @@
   }
 
   /* ── APP SHELL ── */
-  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: -webkit-fill-available; }
 
   /* ── TOP NAV ── */
   #topnav {
@@ -125,21 +126,27 @@
     height: var(--bottom-h);
     background: var(--surface);
     border-top: 1px solid var(--border);
-    display: flex; align-items: center;
+    display: flex; align-items: stretch;
     flex-shrink: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    position: relative; z-index: 10;
   }
   .tab-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 3px;
-    cursor: pointer; padding: 8px 4px;
+    cursor: pointer; padding: 8px 2px;
     border: none; background: none; color: var(--text3);
-    transition: var(--transition); font-family: var(--font);
-    font-size: 11px; font-weight: 500;
+    font-family: var(--font); font-size: 11px; font-weight: 500;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-width: 0;
   }
   .tab-btn.active { color: var(--accent); }
-  .tab-btn:active { transform: scale(0.92); }
-  .tab-icon { font-size: 22px; line-height: 1; }
+  .tab-btn:active { opacity: 0.7; }
+  .tab-icon {
+    font-size: 24px; line-height: 1.2;
+    display: block; text-align: center;
+  }
   .tab-badge {
     position: relative; display: inline-block;
   }
@@ -544,13 +551,16 @@
   .log-text { flex: 1; font-size: 13px; }
   .log-time { font-size: 11px; color: var(--text3); font-family: var(--mono); }
 
-  /* ── RESPONSIVE: tablet/desktop ── */
+  /* ── RESPONSIVE ── */
+  /* Tablets y móviles anchos: más columnas en quick grid y modales centrados */
   @media (min-width: 600px) {
     .quick-grid { grid-template-columns: repeat(6, 1fr); }
     .modal { border-radius: 24px; margin: auto; margin-bottom: 0; }
     .modal-overlay { align-items: center; }
   }
-  @media (min-width: 900px) {
+
+  /* Desktop con ratón (no táctil): barra lateral */
+  @media (min-width: 900px) and (pointer: fine) {
     #app { flex-direction: row; }
     #topnav { display: none; }
     #bottombar {
@@ -565,7 +575,7 @@
       font-size: 14px;
     }
     .tab-btn.active { background: var(--accent-light); color: var(--accent); }
-    .tab-icon { font-size: 20px; }
+    .tab-icon { font-size: 20px; width: auto; height: auto; }
     #main { order: 1; }
     .desktop-logo {
       font-size: 18px; font-weight: 700; padding: 0 20px 16px;
@@ -573,6 +583,15 @@
       color: var(--text); letter-spacing: -0.3px;
     }
     .desktop-logo span { color: var(--accent); }
+  }
+
+  /* Siempre ocultar logo en dispositivos táctiles */
+  @media (pointer: coarse) {
+    .desktop-logo { display: none !important; }
+  }
+  /* Ocultar logo en pantallas pequeñas aunque tengan ratón */
+  @media (max-width: 899px) {
+    .desktop-logo { display: none; }
   }
 
   /* ── NO RESULTS ── */
@@ -893,7 +912,7 @@
 
   <!-- BOTTOM TAB BAR -->
   <nav id="bottombar">
-    <div class="desktop-logo" style="display:none">Avance <span>Dental</span></div>
+    <div class="desktop-logo">Avance <span>Dental</span></div>
     <button class="tab-btn active" data-tab="inicio" onclick="showTab('inicio')">
       <span class="tab-icon">📦</span><span>Inventario</span>
     </button>
@@ -1944,10 +1963,7 @@ document.addEventListener('keydown', e => {
 //  DESKTOP SIDEBAR
 // ═══════════════════════════════════════
 function setupDesktop() {
-  if (window.innerWidth >= 900) {
-    const logo = document.querySelector('.desktop-logo');
-    if (logo) logo.style.display = 'block';
-  }
+  // La barra lateral se controla por CSS (media query ≥900px)
 }
 
 
