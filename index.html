@@ -560,16 +560,19 @@
     .modal-overlay { align-items: center; }
   }
 
-  /* Barra lateral SOLO cuando body tiene clase .is-desktop (asignada por JS) */
-  html.is-desktop #app { flex-direction: row; }
+  /* Barra lateral SOLO cuando html tiene clase .is-desktop (asignada por JS) */
   html.is-desktop #topnav { display: none; }
   html.is-desktop #bottombar {
-    position: static;
-    width: 220px; height: 100vh; flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 220px; height: 100vh;
+    flex-direction: column;
     border-top: none; border-right: 1px solid var(--border);
     padding: 20px 0; justify-content: flex-start; gap: 4px;
     align-items: stretch;
+    background: var(--surface);
   }
+  html.is-desktop #app { margin-left: 220px; }
   html.is-desktop .tab-btn {
     flex-direction: row; gap: 12px; padding: 12px 20px;
     justify-content: flex-start; border-radius: var(--radius-sm); margin: 0 8px;
@@ -577,7 +580,7 @@
   }
   html.is-desktop .tab-btn.active { background: var(--accent-light); color: var(--accent); }
   html.is-desktop .tab-icon { font-size: 20px; }
-  html.is-desktop #main { order: 1; }
+  html.is-desktop #main { padding-bottom: 16px; }
   html.is-desktop .desktop-logo {
     font-size: 18px; font-weight: 700; padding: 0 20px 16px;
     border-bottom: 1px solid var(--border); margin-bottom: 8px;
@@ -913,7 +916,9 @@
 
   </div><!-- /main -->
 
-  <!-- BOTTOM TAB BAR -->
+</div><!-- /app -->
+
+  <!-- BOTTOM TAB BAR — fuera de #app para que position:fixed funcione siempre -->
   <nav id="bottombar">
     <div class="desktop-logo">Avance <span>Dental</span></div>
     <button class="tab-btn active" data-tab="inicio" onclick="showTab('inicio')">
@@ -932,8 +937,6 @@
       <span class="tab-icon">⚙️</span><span>Ajustes</span>
     </button>
   </nav>
-
-</div><!-- /app -->
 
 <!-- MODAL: SYNC SETUP -->
 <div class="modal-overlay" id="modalSync" onclick="closeModal('modalSync')">
