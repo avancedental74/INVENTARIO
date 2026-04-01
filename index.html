@@ -84,7 +84,7 @@
   }
 
   /* ── APP SHELL ── */
-  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: -webkit-fill-available; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: -webkit-fill-available; overflow: hidden; }
 
   /* ── TOP NAV ── */
   #topnav {
@@ -116,7 +116,7 @@
   /* ── MAIN SCROLL AREA ── */
   #main {
     flex: 1; overflow-y: auto; overflow-x: hidden;
-    padding-bottom: calc(var(--bottom-h) + 16px);
+    padding-bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom, 0px) + 16px);
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
@@ -127,9 +127,11 @@
     background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex; align-items: stretch;
-    flex-shrink: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    position: relative; z-index: 10;
+    /* FIJO EN LA PARTE INFERIOR — funciona en todos los dispositivos */
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 1000;
   }
   .tab-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -562,6 +564,7 @@
   html.is-desktop #app { flex-direction: row; }
   html.is-desktop #topnav { display: none; }
   html.is-desktop #bottombar {
+    position: static;
     width: 220px; height: 100vh; flex-direction: column;
     border-top: none; border-right: 1px solid var(--border);
     padding: 20px 0; justify-content: flex-start; gap: 4px;
