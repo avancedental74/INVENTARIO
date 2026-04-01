@@ -574,10 +574,6 @@
     }
     .desktop-logo span { color: var(--accent); }
   }
-  /* Ocultar logo en móvil */
-  @media (max-width: 899px) {
-    .desktop-logo { display: none; }
-  }
 
   /* ── NO RESULTS ── */
   .no-results {
@@ -897,7 +893,7 @@
 
   <!-- BOTTOM TAB BAR -->
   <nav id="bottombar">
-    <div class="desktop-logo">Avance <span>Dental</span></div>
+    <div class="desktop-logo" style="display:none">Avance <span>Dental</span></div>
     <button class="tab-btn active" data-tab="inicio" onclick="showTab('inicio')">
       <span class="tab-icon">📦</span><span>Inventario</span>
     </button>
@@ -1948,7 +1944,10 @@ document.addEventListener('keydown', e => {
 //  DESKTOP SIDEBAR
 // ═══════════════════════════════════════
 function setupDesktop() {
-  // La barra lateral se controla por CSS (media query ≥900px)
+  if (window.innerWidth >= 900) {
+    const logo = document.querySelector('.desktop-logo');
+    if (logo) logo.style.display = 'block';
+  }
 }
 
 
