@@ -2004,13 +2004,15 @@ function setupDesktop() {
 //  JSONBIN.IO SYNC LAYER
 //  API: https://api.jsonbin.io/v3
 //  Modelo: 1 bin = todo el estado (products, compraList, categories, quickIds, history)
-//  Pull cada 30s · Push atómico en cada operación · Offline-first
+//  BroadcastChannel → instantáneo en misma red WiFi
+//  Pull cada 5s como backup · Push atómico en cada operación · Offline-first
 // ═══════════════════════════════════════
 
 const JSONBIN_KEY_STORAGE  = 'avancedental_jsonbin_key';
 const JSONBIN_BIN_STORAGE  = 'avancedental_jsonbin_bin';
 const JSONBIN_API          = 'https://api.jsonbin.io/v3';
-const SYNC_INTERVAL_MS     = 30000;
+const SYNC_INTERVAL_MS     = 5000;   // backup poll — BroadcastChannel es el canal primario
+const BC_CHANNEL_NAME      = 'avancedental_sync_v2';
 
 let _jbKey     = '';  // API Key del usuario
 let _jbBinId   = '';  // ID del bin creado
@@ -2018,6 +2020,7 @@ let _syncTimer = null;
 let _lastSyncTs = 0;
 let _pushing   = false;
 let _pullScheduled = false;
+let _bc        = null;  // BroadcastChannel instance
 
 // ── UI helpers ──────────────────────────────────────────────
 
@@ -2137,6 +2140,8 @@ async function pushBin() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _lastSyncTs = Date.now();
     setSyncState('ok', 'JSONBin');
+    // ── Notificar a todos los dispositivos en la misma red ────
+    _bcBroadcast({ type: 'INVALIDATE', ts: _lastSyncTs });
     return true;
   } catch(e) {
     setSyncState('error', 'Error');
@@ -2197,18 +2202,45 @@ function buildPayload() {
 // ── Debounced push: agrupa cambios rápidos en 1 sola petición ─
 
 let _pushTimer = null;
-function schedulePush(delayMs = 1200) {
+function schedulePush(delayMs = 300) {
   if (!_jbKey || !_jbBinId) return;
   clearTimeout(_pushTimer);
   _pushTimer = setTimeout(() => pushBin(), delayMs);
 }
 
-// ── Auto-pull ────────────────────────────────────────────────
+// ── BroadcastChannel — canal primario entre dispositivos ─────
+
+function _bcBroadcast(msg) {
+  try { if (_bc) _bc.postMessage(msg); } catch(e) { /* canal cerrado */ }
+}
+
+function _initBroadcastChannel() {
+  if (!('BroadcastChannel' in window)) return;  // Safari < 15.4 fallback al poll
+  try {
+    if (_bc) _bc.close();
+    _bc = new BroadcastChannel(BC_CHANNEL_NAME);
+    _bc.onmessage = (e) => {
+      const msg = e.data;
+      if (!msg || msg.type !== 'INVALIDATE') return;
+      if (!_jbKey || !_jbBinId) return;
+      // Evitar doble-pull si el mensaje es propio (mismo timestamp)
+      if (msg.ts && msg.ts === _lastSyncTs) return;
+      // Pull inmediato al recibir notificación de cambio
+      pullBin();
+    };
+  } catch(e) {
+    console.warn('BroadcastChannel no disponible:', e.message);
+    _bc = null;
+  }
+}
+
+// ── Auto-pull (backup poll cada 5s + visibilityChange inmediato) ─
 
 let _visibilityListenerAdded = false;
 
 function _onVisibilityChange() {
-  if (!document.hidden && _jbKey && _jbBinId && Date.now() - _lastSyncTs > 15000) {
+  // Sin guard de tiempo — pull inmediato al volver a la app
+  if (!document.hidden && _jbKey && _jbBinId) {
     pullBin();
   }
 }
@@ -2217,11 +2249,15 @@ function startAutoSync() {
   if (_syncTimer) clearInterval(_syncTimer);
   if (!_jbKey || !_jbBinId) return;
 
+  // BroadcastChannel: canal primario instantáneo
+  _initBroadcastChannel();
+
+  // Poll de backup cada 5s (cubre Safari antiguo y tabs sin BroadcastChannel)
   _syncTimer = setInterval(() => {
     if (!document.hidden) pullBin();
   }, SYNC_INTERVAL_MS);
 
-  // Añadir el listener solo una vez, sin importar cuántas veces se llame startAutoSync
+  // visibilityChange: pull inmediato al desbloquear pantalla o volver a la app
   if (!_visibilityListenerAdded) {
     document.addEventListener('visibilitychange', _onVisibilityChange);
     _visibilityListenerAdded = true;
@@ -2260,53 +2296,53 @@ function initSync() {
     pullBin().then(() => startAutoSync());
   }
 
-  // confirmUse → push tras descontar
+  // confirmUse → push tras descontar (operación crítica — delay mínimo)
   const origUse = window.confirmUse;
   window.confirmUse = function() {
     origUse.call(this);
-    schedulePush();
+    schedulePush(300);
   };
 
   // confirmAdd → push tras añadir stock
   const origAdd = window.confirmAdd;
   window.confirmAdd = function() {
     origAdd.call(this);
-    schedulePush();
+    schedulePush(300);
   };
 
   // confirmEdit → push tras editar producto
   const origEdit = window.confirmEdit;
   window.confirmEdit = function() {
     origEdit.call(this);
-    schedulePush(800);
+    schedulePush(500);
   };
 
   // confirmNewProduct → push tras crear producto
   const origNew = window.confirmNewProduct;
   window.confirmNewProduct = function() {
     origNew.call(this);
-    schedulePush(800);
+    schedulePush(500);
   };
 
   // deleteProduct → push tras borrar
   const origDel = window.deleteProduct;
   window.deleteProduct = function() {
     origDel.call(this);
-    schedulePush(800);
+    schedulePush(500);
   };
 
   // toggleCompraItem → push al marcar/desmarcar compra
   const origToggle = window.toggleCompraItem;
   window.toggleCompraItem = function(id) {
     origToggle.call(this, id);
-    schedulePush(1500);
+    schedulePush(500);
   };
 
   // clearCompra → push al limpiar lista
   const origClear = window.clearCompra;
   window.clearCompra = function() {
     origClear.call(this);
-    schedulePush(800);
+    schedulePush(500);
   };
 }
 
@@ -2444,7 +2480,7 @@ window.addEventListener('load', checkIOSInstall);
 // ═══════════════════════════════════════
 
 // ── VERSIÓN DE LA APP — incrementa este número cada vez que subas cambios a GitHub ──
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 async function checkForUpdate() {
   try {
