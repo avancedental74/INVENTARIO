@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Avance Dental — Inventario</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563EB">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Inventario">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F4F2;
+    --surface: #FFFFFF;
+    --surface2: #F0EFEc;
+    --border: #E5E3DE;
+    --text: #1A1916;
+    --text2: #6B6860;
+    --text3: #A09E99;
+    --accent: #2563EB;
+    --accent-light: #EFF6FF;
+    --green: #16A34A;
+    --green-light: #F0FDF4;
+    --red: #DC2626;
+    --red-light: #FEF2F2;
+    --amber: #D97706;
+    --amber-light: #FFFBEB;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+    --radius: 14px;
+    --radius-sm: 8px;
+    --radius-lg: 20px;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+    --nav-h: 64px;
+    --bottom-h: 72px;
+    --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+  }
+  [data-theme="dark"] {
+    --bg: #111110;
+    --surface: #1C1B19;
+    --surface2: #252420;
+    --border: #2E2D2A;
+    --text: #F5F4F2;
+    --text2: #A09E99;
+    --text3: #6B6860;
+    --accent: #3B82F6;
+    --accent-light: #1E3A5F;
+    --green: #22C55E;
+    --green-light: #052E16;
+    --red: #EF4444;
+    --red-light: #450A0A;
+    --amber: #F59E0B;
+    --amber-light: #431407;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.5);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100%;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── APP SHELL ── */
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+  /* ── TOP NAV ── */
+  #topnav {
+    height: var(--nav-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .nav-logo {
+    font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+    color: var(--text);
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-actions { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: var(--transition); font-size: 16px;
+    color: var(--text2);
+  }
+  .icon-btn:hover { background: var(--border); }
+  .icon-btn:active { transform: scale(0.94); }
+
+  /* ── MAIN SCROLL AREA ── */
+  #main {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding-bottom: calc(var(--bottom-h) + 16px);
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* ── BOTTOM TAB BAR ── */
+  #bottombar {
+    height: var(--bottom-h);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    flex-shrink: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px;
+    cursor: pointer; padding: 8px 4px;
+    border: none; background: none; color: var(--text3);
+    transition: var(--transition); font-family: var(--font);
+    font-size: 11px; font-weight: 500;
+  }
+  .tab-btn.active { color: var(--accent); }
+  .tab-btn:active { transform: scale(0.92); }
+  .tab-icon { font-size: 22px; line-height: 1; }
+  .tab-badge {
+    position: relative; display: inline-block;
+  }
+  .tab-badge::after {
+    content: attr(data-count);
+    position: absolute; top: -4px; right: -8px;
+    background: var(--red); color: #fff;
+    font-size: 9px; font-weight: 700;
+    min-width: 16px; height: 16px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    padding: 0 3px;
+  }
+  .tab-badge[data-count="0"]::after { display: none; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; padding: 16px; }
+  .screen.active { display: block; }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.4px;
+  }
+  .section-sub { font-size: 13px; color: var(--text3); margin-top: 1px; }
+
+  /* ── SEARCH BOX ── */
+  .search-wrap {
+    position: relative; margin-bottom: 16px;
+  }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-size: 16px; color: var(--text3); pointer-events: none;
+  }
+  .search-input {
+    width: 100%; height: 46px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0 14px 0 42px;
+    font-family: var(--font); font-size: 15px; color: var(--text);
+    outline: none; transition: var(--transition);
+    box-shadow: var(--shadow);
+  }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+  .search-input::placeholder { color: var(--text3); }
+  .search-clear {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font-size: 14px; color: var(--text3); cursor: pointer; display: none;
+    width: 22px; height: 22px; border-radius: 11px;
+    background: var(--surface2); border: none;
+    align-items: center; justify-content: center;
+  }
+  .search-clear.show { display: flex; }
+
+  /* ── ALERT BANNER ── */
+  .alert-banner {
+    background: var(--red-light); border: 1px solid var(--red);
+    border-radius: var(--radius); padding: 12px 14px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: var(--transition);
+  }
+  .alert-banner:active { transform: scale(0.98); }
+  .alert-banner-icon { font-size: 20px; }
+  .alert-banner-text { flex: 1; }
+  .alert-banner-title { font-size: 14px; font-weight: 600; color: var(--red); }
+  .alert-banner-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .alert-banner-arrow { color: var(--text3); font-size: 14px; }
+
+  /* ── QUICK ACCESS ── */
+  .quick-title {
+    font-size: 13px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .quick-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 20px;
+  }
+  .quick-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; transition: var(--transition); box-shadow: var(--shadow);
+    min-height: 72px; justify-content: center;
+  }
+  .quick-btn:active { transform: scale(0.93); background: var(--surface2); }
+  .quick-btn-icon { font-size: 22px; }
+  .quick-btn-name {
+    font-size: 10px; font-weight: 500; color: var(--text2);
+    text-align: center; line-height: 1.3;
+  }
+  .quick-btn-stock {
+    font-size: 11px; font-weight: 700;
+    padding: 1px 6px; border-radius: 5px;
+  }
+  .quick-btn-stock.ok { background: var(--green-light); color: var(--green); }
+  .quick-btn-stock.low { background: var(--amber-light); color: var(--amber); }
+  .quick-btn-stock.out { background: var(--red-light); color: var(--red); }
+
+  /* ── CATEGORY CHIPS ── */
+  .cat-scroll {
+    display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px;
+    padding-bottom: 4px; scrollbar-width: none;
+  }
+  .cat-scroll::-webkit-scrollbar { display: none; }
+  .cat-chip {
+    flex-shrink: 0; padding: 7px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; font-size: 13px; font-weight: 500;
+    color: var(--text2); cursor: pointer; transition: var(--transition);
+    white-space: nowrap;
+  }
+  .cat-chip.active {
+    background: var(--accent); border-color: var(--accent);
+    color: #fff; font-weight: 600;
+  }
+  .cat-chip:active { transform: scale(0.94); }
+
+  /* ── PRODUCT CARDS ── */
+  .product-list { display: flex; flex-direction: column; gap: 8px; }
+  .product-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); transition: var(--transition);
+    cursor: pointer;
+  }
+  .product-card:active { transform: scale(0.98); background: var(--surface2); }
+  .product-card.alert-row { border-left: 3px solid var(--red); }
+  .product-card.warn-row { border-left: 3px solid var(--amber); }
+  .product-info { flex: 1; min-width: 0; }
+  .product-name {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .product-cat { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .product-stock-area { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .stock-badge {
+    font-size: 18px; font-weight: 700; font-family: var(--mono);
+    min-width: 36px; text-align: center;
+  }
+  .stock-badge.ok { color: var(--green); }
+  .stock-badge.low { color: var(--amber); }
+  .stock-badge.out { color: var(--red); }
+  .use-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 20px; font-weight: 300; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: var(--transition); flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+  }
+  .use-btn:active { transform: scale(0.88); background: #1d4ed8; }
+  .use-btn:disabled { background: var(--border); color: var(--text3); box-shadow: none; cursor: not-allowed; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center; padding: 60px 24px;
+    color: var(--text3);
+  }
+  .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state-title { font-size: 17px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+  .empty-state-sub { font-size: 14px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px); z-index: 100;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 24px 24px 0 0;
+    width: 100%; max-width: 520px; padding: 24px 20px 32px;
+    max-height: 90vh; overflow-y: auto;
+    animation: slideUp 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle {
+    width: 36px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 20px;
+  }
+  .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .modal-sub { font-size: 13px; color: var(--text3); margin-bottom: 20px; }
+  .modal-field { margin-bottom: 16px; }
+  .modal-label { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; display: block; }
+  .modal-input {
+    width: 100%; height: 46px; padding: 0 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: var(--font);
+    font-size: 15px; color: var(--text); outline: none; transition: var(--transition);
+  }
+  .modal-input:focus { border-color: var(--accent); background: var(--surface); }
+  .modal-select {
+    width: 100%; height: 46px; padding: 0 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: var(--font);
+    font-size: 15px; color: var(--text); outline: none; appearance: none;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary {
+    flex: 1; height: 50px; background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius); font-family: var(--font);
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition);
+  }
+  .btn-primary:active { transform: scale(0.97); background: #1d4ed8; }
+  .btn-secondary {
+    height: 50px; padding: 0 20px; background: var(--surface2); color: var(--text2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: var(--font); font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: var(--transition);
+  }
+  .btn-secondary:active { transform: scale(0.97); }
+  .btn-danger {
+    height: 42px; padding: 0 16px; background: var(--red-light); color: var(--red);
+    border: 1px solid var(--red); border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: var(--transition);
+  }
+  .btn-danger:active { transform: scale(0.97); }
+
+  /* ── STOCK COUNTER IN MODAL ── */
+  .stock-counter {
+    display: flex; align-items: center; gap: 12px; margin: 16px 0;
+    justify-content: center;
+  }
+  .counter-btn {
+    width: 52px; height: 52px; border-radius: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-size: 24px; cursor: pointer; transition: var(--transition);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); font-weight: 300;
+  }
+  .counter-btn:active { transform: scale(0.88); }
+  .counter-btn.add { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .counter-val {
+    font-size: 48px; font-weight: 700; font-family: var(--mono);
+    min-width: 80px; text-align: center; color: var(--text);
+    letter-spacing: -2px;
+  }
+
+  /* ── PRODUCT DETAIL MODAL ── */
+  .detail-stock-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2); border-radius: var(--radius); padding: 16px;
+    margin-bottom: 16px;
+  }
+  .detail-stock-label { font-size: 13px; color: var(--text3); }
+  .detail-stock-num { font-size: 36px; font-weight: 700; font-family: var(--mono); }
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row-label { font-size: 14px; color: var(--text2); }
+  .detail-row-val { font-size: 14px; font-weight: 600; }
+  .detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  /* ── SHOPPING LIST ── */
+  .compra-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 12px;
+    text-align: center; box-shadow: var(--shadow);
+  }
+  .stat-num { font-size: 26px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text3); font-weight: 500; margin-top: 2px; }
+  .compra-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); margin-bottom: 8px;
+    transition: var(--transition);
+  }
+  .compra-item.done { opacity: 0.4; }
+  .compra-item.done .compra-name { text-decoration: line-through; }
+  .compra-check {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: var(--surface2); border: 2px solid var(--border);
+    cursor: pointer; transition: var(--transition); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .compra-check.checked { background: var(--green); border-color: var(--green); color: #fff; }
+  .compra-check:active { transform: scale(0.88); }
+  .compra-info { flex: 1; min-width: 0; }
+  .compra-name { font-size: 14px; font-weight: 600; }
+  .compra-detail { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .compra-qty {
+    font-size: 15px; font-weight: 700; font-family: var(--mono);
+    color: var(--accent); flex-shrink: 0;
+    background: var(--accent-light); padding: 4px 10px; border-radius: 8px;
+  }
+  .btn-compra-actions {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .btn-outline {
+    flex: 1; height: 42px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    color: var(--text2); cursor: pointer; transition: var(--transition);
+  }
+  .btn-outline:active { transform: scale(0.97); background: var(--surface2); }
+  .btn-outline.danger { color: var(--red); border-color: var(--red); }
+
+  /* ── PREDICCION ── */
+  .pred-upload {
+    background: var(--surface); border: 2px dashed var(--border);
+    border-radius: var(--radius-lg); padding: 32px 20px; text-align: center;
+    margin-bottom: 20px; cursor: pointer; transition: var(--transition);
+  }
+  .pred-upload:hover { border-color: var(--accent); background: var(--accent-light); }
+  .pred-upload-icon { font-size: 40px; margin-bottom: 10px; }
+  .pred-upload-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .pred-upload-sub { font-size: 13px; color: var(--text3); }
+  .pred-result {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 10px;
+    box-shadow: var(--shadow);
+  }
+  .pred-result-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .pred-result-title { font-size: 16px; font-weight: 700; }
+  .pred-result-badge {
+    font-size: 12px; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; background: var(--green-light); color: var(--green);
+  }
+  .pred-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .pred-row:last-child { border-bottom: none; }
+  .pred-row-name { color: var(--text2); }
+  .pred-row-val { font-weight: 600; font-family: var(--mono); }
+
+  /* ── AJUSTES ── */
+  .settings-section { margin-bottom: 24px; }
+  .settings-title {
+    font-size: 13px; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px;
+    padding-left: 4px;
+  }
+  .settings-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+    transition: var(--transition);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row:active { background: var(--surface2); }
+  .settings-row-left { display: flex; align-items: center; gap: 12px; }
+  .settings-row-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .settings-row-text { font-size: 15px; font-weight: 500; }
+  .settings-row-sub { font-size: 12px; color: var(--text3); }
+  .settings-arrow { color: var(--text3); font-size: 14px; }
+  .toggle {
+    width: 46px; height: 26px; border-radius: 13px;
+    background: var(--border); cursor: pointer; position: relative;
+    transition: var(--transition); border: none; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 10px;
+    background: #fff; transition: var(--transition);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: calc(var(--bottom-h) + 16px); left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 12px 20px;
+    border-radius: var(--radius); font-size: 14px; font-weight: 500;
+    z-index: 200; opacity: 0; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    white-space: nowrap; box-shadow: var(--shadow-lg);
+    pointer-events: none; max-width: calc(100vw - 32px);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── HISTORY LOG ── */
+  .log-entry {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+  }
+  .log-dot {
+    width: 8px; height: 8px; border-radius: 4px; flex-shrink: 0;
+  }
+  .log-dot.use { background: var(--amber); }
+  .log-dot.add { background: var(--green); }
+  .log-text { flex: 1; font-size: 13px; }
+  .log-time { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  /* ── RESPONSIVE: tablet/desktop ── */
+  @media (min-width: 600px) {
+    .quick-grid { grid-template-columns: repeat(6, 1fr); }
+    .modal { border-radius: 24px; margin: auto; margin-bottom: 0; }
+    .modal-overlay { align-items: center; }
+  }
+  @media (min-width: 900px) {
+    #app { flex-direction: row; }
+    #topnav { display: none; }
+    #bottombar {
+      width: 220px; height: 100vh; flex-direction: column;
+      border-top: none; border-right: 1px solid var(--border);
+      padding: 20px 0; justify-content: flex-start; gap: 4px;
+      align-items: stretch;
+    }
+    .tab-btn {
+      flex-direction: row; gap: 12px; padding: 12px 20px;
+      justify-content: flex-start; border-radius: var(--radius-sm); margin: 0 8px;
+      font-size: 14px;
+    }
+    .tab-btn.active { background: var(--accent-light); color: var(--accent); }
+    .tab-icon { font-size: 20px; }
+    #main { order: 1; }
+    .desktop-logo {
+      font-size: 18px; font-weight: 700; padding: 0 20px 16px;
+      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+      color: var(--text); letter-spacing: -0.3px;
+    }
+    .desktop-logo span { color: var(--accent); }
+  }
+
+  /* ── NO RESULTS ── */
+  .no-results {
+    text-align: center; padding: 40px 20px; color: var(--text3);
+  }
+
+  /* ── CHIP FILTER ── */
+  .filter-bar {
+    display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 16px;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition);
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+  }
+  .filter-chip.active.all { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .filter-chip.active.alert { background: var(--red); color: #fff; border-color: var(--red); }
+  .filter-chip.active.warn { background: var(--amber); color: #fff; border-color: var(--amber); }
+  .filter-chip.active.ok { background: var(--green); color: #fff; border-color: var(--green); }
+
+  .highlight { background: var(--amber-light); color: var(--amber); border-radius: 2px; }
+
+  /* ── SYNC BAR ── */
+  #syncBar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+    height: 3px; background: transparent; pointer-events: none;
+  }
+  #syncBar.syncing {
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: syncSlide 1.2s linear infinite;
+  }
+  @keyframes syncSlide { from { background-position: -200px 0; } to { background-position: 200px 0; } }
+
+  /* ── SYNC STATUS CHIP ── */
+  #syncStatus {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500; padding: 4px 10px;
+    border-radius: 20px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text3);
+    cursor: pointer; transition: var(--transition); user-select: none;
+  }
+  #syncStatus.ok { color: var(--green); border-color: var(--green); background: var(--green-light); }
+  #syncStatus.syncing { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+  #syncStatus.error { color: var(--red); border-color: var(--red); background: var(--red-light); }
+  #syncStatus.local { color: var(--amber); border-color: var(--amber); background: var(--amber-light); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  #syncStatus.syncing .sync-dot { animation: syncPulse 0.8s ease-in-out infinite; }
+  @keyframes syncPulse { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+
+  /* ── SETUP MODAL ── */
+  .setup-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+  }
+  .setup-step {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+  }
+  .setup-step:last-child { border-bottom: none; }
+  .setup-num {
+    width: 24px; height: 24px; border-radius: 12px;
+    background: var(--accent); color: #fff;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .setup-num.done { background: var(--green); }
+  .url-input-wrap { position: relative; margin-top: 10px; }
+  .url-input {
+    width: 100%; height: 46px; padding: 0 14px;
+    background: var(--surface); border: 2px solid var(--accent);
+    border-radius: var(--radius-sm); font-family: var(--mono);
+    font-size: 12px; color: var(--text); outline: none;
+  }
+  .url-input::placeholder { font-family: var(--font); font-size: 14px; color: var(--text3); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SYNC PROGRESS BAR -->
+  <div id="syncBar"></div>
+
+  <!-- TOP NAV (mobile) -->
+  <nav id="topnav">
+    <div class="nav-logo">Avance <span>Dental</span></div>
+    <div class="nav-actions" style="gap:6px">
+      <div id="syncStatus" class="local" onclick="openSyncSetup()" title="Estado sincronización">
+        <div class="sync-dot"></div>
+        <span id="syncLabel">Local</span>
+      </div>
+      <button class="icon-btn" onclick="openAddProduct()" title="Añadir producto">＋</button>
+      <button class="icon-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Tema">🌙</button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div id="main">
+
+    <!-- SCREEN: INICIO -->
+    <div class="screen active" id="screen-inicio">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Inventario</div>
+          <div class="section-sub" id="inv-sub">Cargando...</div>
+        </div>
+        <button class="icon-btn" onclick="openAddProduct()">＋</button>
+      </div>
+
+      <!-- Alert banner -->
+      <div class="alert-banner" id="alertBanner" onclick="showTab('alertas')" style="display:none">
+        <div class="alert-banner-icon">🔴</div>
+        <div class="alert-banner-text">
+          <div class="alert-banner-title" id="alertBannerTitle">Productos agotados o bajo mínimo</div>
+          <div class="alert-banner-sub" id="alertBannerSub">Pulsa para ver</div>
+        </div>
+        <div class="alert-banner-arrow">›</div>
+      </div>
+
+      <!-- Quick access -->
+      <div class="quick-title">Acceso rápido</div>
+      <div class="quick-grid" id="quickGrid"></div>
+
+      <!-- Search -->
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="searchInput" placeholder="Buscar producto..." autocomplete="off" spellcheck="false" oninput="onSearch(this)">
+        <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+      </div>
+
+      <!-- Category filter -->
+      <div class="cat-scroll" id="catScroll"></div>
+
+      <!-- Filter chips -->
+      <div class="filter-bar">
+        <div class="filter-chip active all" data-filter="all" onclick="setStockFilter('all',this)">Todos</div>
+        <div class="filter-chip alert" data-filter="alert" onclick="setStockFilter('alert',this)">Sin stock 🔴</div>
+        <div class="filter-chip warn" data-filter="warn" onclick="setStockFilter('warn',this)">Bajo mínimo 🟡</div>
+        <div class="filter-chip ok" data-filter="ok" onclick="setStockFilter('ok',this)">OK ✅</div>
+      </div>
+
+      <!-- Products list -->
+      <div class="product-list" id="productList"></div>
+    </div>
+
+    <!-- SCREEN: ALERTAS -->
+    <div class="screen" id="screen-alertas">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Alertas</div>
+          <div class="section-sub" id="alerts-sub">Stock bajo o agotado</div>
+        </div>
+      </div>
+      <div class="product-list" id="alertList"></div>
+    </div>
+
+    <!-- SCREEN: COMPRAS -->
+    <div class="screen" id="screen-compras">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Lista de Compra</div>
+          <div class="section-sub" id="compras-sub">Generada automáticamente</div>
+        </div>
+      </div>
+      <div class="compra-stats" id="compraStats"></div>
+      <div class="btn-compra-actions">
+        <button class="btn-outline" onclick="exportCompra()">📤 Exportar</button>
+        <button class="btn-outline danger" onclick="clearCompra()">🗑 Limpiar completados</button>
+      </div>
+      <div id="compraList"></div>
+    </div>
+
+    <!-- SCREEN: PREDICCION -->
+    <div class="screen" id="screen-prediccion">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Predicción</div>
+          <div class="section-sub">Basada en pacientes</div>
+        </div>
+      </div>
+      <div class="pred-upload" onclick="document.getElementById('pacientesFile').click()">
+        <div class="pred-upload-icon">📊</div>
+        <div class="pred-upload-title">Subir Excel de pacientes</div>
+        <div class="pred-upload-sub">Exporta tu lista mensual desde el software dental<br>y la app calculará el consumo estimado</div>
+        <input type="file" id="pacientesFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="processPacientes(this)">
+      </div>
+      <div id="predResults"></div>
+      <div id="predHistory"></div>
+    </div>
+
+    <!-- SCREEN: AJUSTES -->
+    <div class="screen" id="screen-ajustes">
+      <div class="section-header">
+        <div><div class="section-title">Ajustes</div></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Apariencia</div>
+        <div class="settings-card">
+          <div class="settings-row" onclick="toggleTheme()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#F3F4F6">🌙</div>
+              <div>
+                <div class="settings-row-text">Modo oscuro</div>
+              </div>
+            </div>
+            <button class="toggle" id="darkToggle" onclick="event.stopPropagation();toggleTheme()"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Catálogo</div>
+        <div class="settings-card">
+          <div class="settings-row" onclick="openAddProduct()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#EFF6FF">➕</div>
+              <div><div class="settings-row-text">Añadir producto</div></div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="openManageCategories()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#F0FDF4">📁</div>
+              <div>
+                <div class="settings-row-text">Gestionar categorías</div>
+                <div class="settings-row-sub" id="catCount">11 categorías</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="openBulkMinimos()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#FFFBEB">⚠️</div>
+              <div>
+                <div class="settings-row-text">Ajustar mínimos globales</div>
+                <div class="settings-row-sub">Mínimo por defecto: 2 uds</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="exportData()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#F5F3FF">📥</div>
+              <div><div class="settings-row-text">Exportar inventario</div></div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Sincronización</div>
+        <div class="settings-card">
+          <div class="settings-row" onclick="openSyncSetup()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#EFF6FF">☁️</div>
+              <div>
+                <div class="settings-row-text">JSONBin</div>
+                <div class="settings-row-sub" id="syncSettingsSub">Sin configurar</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="forcePullFromSheets()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#F0FDF4">⬇️</div>
+              <div>
+                <div class="settings-row-text">Obtener datos de Sheets</div>
+                <div class="settings-row-sub">Sobreescribe datos locales</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="forcePushToSheets()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#FEF2F2">⬆️</div>
+              <div>
+                <div class="settings-row-text">Enviar datos a Sheets</div>
+                <div class="settings-row-sub">Sobreescribe datos en la nube</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+
+        <div class="settings-card">
+          <div class="settings-row" onclick="openHistory()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#FEF2F2">📋</div>
+              <div>
+                <div class="settings-row-text">Historial de movimientos</div>
+                <div class="settings-row-sub" id="histCount">0 movimientos</div>
+              </div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="if(confirm('¿Resetear TODOS los datos? Esta acción no se puede deshacer.')) resetAll()">
+            <div class="settings-row-left">
+              <div class="settings-row-icon" style="background:#FEF2F2">🗑️</div>
+              <div><div class="settings-row-text" style="color:var(--red)">Resetear todos los datos</div></div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:12px">
+        Avance Dental Inventario v2.0 · JSONBin Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- BOTTOM TAB BAR -->
+  <nav id="bottombar">
+    <div class="desktop-logo" style="display:none">Avance <span>Dental</span></div>
+    <button class="tab-btn active" data-tab="inicio" onclick="showTab('inicio')">
+      <span class="tab-icon">📦</span><span>Inventario</span>
+    </button>
+    <button class="tab-btn" data-tab="alertas" onclick="showTab('alertas')">
+      <span class="tab-badge tab-icon" id="alertTabBadge" data-count="0">🔴</span><span>Alertas</span>
+    </button>
+    <button class="tab-btn" data-tab="compras" onclick="showTab('compras')">
+      <span class="tab-badge tab-icon" id="compraTabBadge" data-count="0">🛒</span><span>Compras</span>
+    </button>
+    <button class="tab-btn" data-tab="prediccion" onclick="showTab('prediccion')">
+      <span class="tab-icon">📊</span><span>Predicción</span>
+    </button>
+    <button class="tab-btn" data-tab="ajustes" onclick="showTab('ajustes')">
+      <span class="tab-icon">⚙️</span><span>Ajustes</span>
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- MODAL: SYNC SETUP -->
+<div class="modal-overlay" id="modalSync" onclick="closeModal('modalSync')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">☁️ Sincronización con JSONBin</div>
+    <div class="modal-sub">Gratis · Sin apps de Google · Funciona en cualquier dispositivo</div>
+
+    <div class="setup-card">
+      <div class="setup-step">
+        <div class="setup-num done">1</div>
+        <div>
+          <strong>Crea una cuenta gratuita</strong><br>
+          <span style="color:var(--text3);font-size:13px">Ve a <a href="https://jsonbin.io" target="_blank" style="color:var(--accent)">jsonbin.io</a> → Sign Up (gratis). Confirma el email.</span>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="setup-num done">2</div>
+        <div>
+          <strong>Copia tu API Key</strong><br>
+          <span style="color:var(--text3);font-size:13px">Una vez dentro → menú superior → <b>API Keys</b> → copia la clave que aparece (empieza por <code>$2b$...</code>).</span>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="setup-num done">3</div>
+        <div>
+          <strong>Pega la API Key aquí</strong><br>
+          <div class="url-input-wrap" style="margin-top:8px">
+            <input class="url-input" id="jsonbinKeyInput"
+              placeholder="$2b$10$xxxxxxxxxxxxxxxxxxxxxxxx..."
+              autocomplete="off" spellcheck="false" style="font-size:13px">
+          </div>
+        </div>
+      </div>
+      <div class="setup-step" style="flex-direction:column;gap:8px;border-bottom:none">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="setup-num" id="step4num">4</div>
+          <strong>Conectar y subir inventario</strong>
+        </div>
+        <button class="btn-primary" style="margin-top:4px" onclick="saveJsonbinKey()">✅ Conectar</button>
+      </div>
+    </div>
+
+    <div id="syncTestResult" style="display:none;padding:12px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px"></div>
+
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:14px">
+      🔒 Tu API key se guarda solo en este dispositivo (localStorage).<br>Límite gratuito: 10.000 peticiones/mes.
+    </div>
+
+    <button class="btn-secondary" style="width:100%" onclick="closeModal('modalSync')">Cerrar</button>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+
+<!-- MODAL: PRODUCT DETAIL / USE -->
+<div class="modal-overlay" id="modalDetail" onclick="closeModal('modalDetail')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="detailName">Producto</div>
+    <div class="modal-sub" id="detailCat">Categoría</div>
+    <div class="detail-stock-row">
+      <div>
+        <div class="detail-stock-label">Stock actual</div>
+        <div class="detail-stock-num" id="detailStock">0</div>
+      </div>
+      <div style="text-align:right">
+        <div class="detail-stock-label">Mínimo</div>
+        <div class="detail-stock-num" id="detailMin" style="font-size:24px;color:var(--text3)">2</div>
+      </div>
+    </div>
+    <div id="detailRows"></div>
+    <div class="detail-actions" id="detailActions"></div>
+  </div>
+</div>
+
+<!-- MODAL: USE PRODUCT (quick) -->
+<div class="modal-overlay" id="modalUse" onclick="closeModal('modalUse')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="useName">Usar producto</div>
+    <div class="modal-sub" id="useCat"></div>
+    <div style="text-align:center;margin:8px 0 4px;color:var(--text3);font-size:13px">¿Cuántas unidades usas?</div>
+    <div class="stock-counter">
+      <button class="counter-btn" onclick="changeUseQty(-1)">−</button>
+      <div class="counter-val" id="useQtyVal">1</div>
+      <button class="counter-btn add" onclick="changeUseQty(1)">＋</button>
+    </div>
+    <div style="text-align:center;font-size:13px;color:var(--text3);margin-bottom:16px">
+      Stock actual: <strong id="useCurrentStock">0</strong> uds
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('modalUse')">Cancelar</button>
+      <button class="btn-primary" onclick="confirmUse()">Descontar del stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD STOCK (receive order) -->
+<div class="modal-overlay" id="modalAdd" onclick="closeModal('modalAdd')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="addName">Añadir stock</div>
+    <div class="modal-sub" id="addCat"></div>
+    <div style="text-align:center;margin:8px 0 4px;color:var(--text3);font-size:13px">¿Cuántas unidades recibes?</div>
+    <div class="stock-counter">
+      <button class="counter-btn" onclick="changeAddQty(-1)">−</button>
+      <div class="counter-val" id="addQtyVal">1</div>
+      <button class="counter-btn add" onclick="changeAddQty(1)">＋</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('modalAdd')">Cancelar</button>
+      <button class="btn-primary" style="background:var(--green)" onclick="confirmAdd()">Añadir al stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD NEW PRODUCT -->
+<div class="modal-overlay" id="modalNewProduct" onclick="closeModal('modalNewProduct')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nuevo producto</div>
+    <div class="modal-sub">Añadir al inventario</div>
+    <div class="modal-field">
+      <label class="modal-label">Nombre del producto *</label>
+      <input class="modal-input" id="newProdName" placeholder="ej: guantes m nitrilo" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Categoría *</label>
+      <select class="modal-select" id="newProdCat"></select>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Stock inicial</label>
+      <input class="modal-input" id="newProdStock" type="number" value="0" min="0">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Mínimo de stock</label>
+      <input class="modal-input" id="newProdMin" type="number" value="2" min="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal('modalNewProduct')">Cancelar</button>
+      <button class="btn-primary" onclick="confirmNewProduct()">Guardar producto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDIT PRODUCT -->
+<div class="modal-overlay" id="modalEdit" onclick="closeModal('modalEdit')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Editar producto</div>
+    <input type="hidden" id="editProdId">
+    <div class="modal-field">
+      <label class="modal-label">Nombre</label>
+      <input class="modal-input" id="editProdName" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Categoría</label>
+      <select class="modal-select" id="editProdCat"></select>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Stock actual</label>
+      <input class="modal-input" id="editProdStock" type="number" min="0">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Mínimo de stock</label>
+      <input class="modal-input" id="editProdMin" type="number" min="0">
+    </div>
+    <div class="modal-actions" style="flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="closeModal('modalEdit')">Cancelar</button>
+        <button class="btn-primary" onclick="confirmEdit()">Guardar cambios</button>
+      </div>
+      <button class="btn-danger" style="width:100%" onclick="deleteProduct()">🗑 Eliminar producto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MANAGE CATEGORIES -->
+<div class="modal-overlay" id="modalCats" onclick="closeModal('modalCats')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Categorías</div>
+    <div class="modal-sub">Gestiona las categorías del inventario</div>
+    <div id="catList" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input class="modal-input" id="newCatInput" placeholder="Nueva categoría..." style="flex:1">
+      <button class="btn-primary" style="flex:0;padding:0 18px;height:46px;font-size:14px" onclick="addCategory()">Añadir</button>
+    </div>
+    <button class="btn-secondary" style="width:100%" onclick="closeModal('modalCats')">Cerrar</button>
+  </div>
+</div>
+
+<!-- MODAL: HISTORY -->
+<div class="modal-overlay" id="modalHistory" onclick="closeModal('modalHistory')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Historial</div>
+    <div class="modal-sub">Últimos 50 movimientos</div>
+    <div id="historyList" style="max-height:60vh;overflow-y:auto"></div>
+    <button class="btn-secondary" style="width:100%;margin-top:16px" onclick="closeModal('modalHistory')">Cerrar</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATA LAYER
+// ═══════════════════════════════════════
+
+const INITIAL_PRODUCTS = [{"id":1,"nombre":"guantes xs nitrilo","stock":3,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":2,"nombre":"guantes xs latex","stock":1,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":3,"nombre":"guantes s nitrilo","stock":15,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":4,"nombre":"guantes m nitrilo","stock":12,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":5,"nombre":"guantes L nitrilo","stock":6,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":6,"nombre":"guantes 5 1/2","stock":0,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":7,"nombre":"guantes 6 1/2","stock":3,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":8,"nombre":"guantes 7 1/2","stock":1,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":9,"nombre":"campos quirurgicos","stock":100,"minimo":10,"categoria":"Protección y Desechables","unidad":"uds"},{"id":10,"nombre":"bolsas solución","stock":13,"minimo":5,"categoria":"Protección y Desechables","unidad":"uds"},{"id":11,"nombre":"servilletas baño","stock":18,"minimo":3,"categoria":"Protección y Desechables","unidad":"uds"},{"id":12,"nombre":"servilletas","stock":6,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":13,"nombre":"baberos","stock":1,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":14,"nombre":"eyectores","stock":6,"minimo":3,"categoria":"Protección y Desechables","unidad":"uds"},{"id":15,"nombre":"wipes","stock":7,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":16,"nombre":"manteles unidad","stock":5,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":17,"nombre":"alginato","stock":3,"minimo":2,"categoria":"Impresiones y Prótesis","unidad":"uds"},{"id":18,"nombre":"bolsa esterilización 57x133mm","stock":3,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":19,"nombre":"bolsa esterilización 70x254mm","stock":2,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":20,"nombre":"bolsa esterilización 89x254mm","stock":5,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":21,"nombre":"bolsa de esterilización 134x280mm","stock":5,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":22,"nombre":"bolsa de esterilización para caja cirugía","stock":0,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":23,"nombre":"gasas cuadradas","stock":1,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":24,"nombre":"clorhexidina","stock":2,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":25,"nombre":"vasos plásticos","stock":15,"minimo":3,"categoria":"Protección y Desechables","unidad":"uds"},{"id":26,"nombre":"silicona pesada","stock":5,"minimo":2,"categoria":"Impresiones y Prótesis","unidad":"uds"},{"id":27,"nombre":"silicona liviana","stock":14,"minimo":3,"categoria":"Impresiones y Prótesis","unidad":"uds"},{"id":28,"nombre":"cavicide","stock":1,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":29,"nombre":"gel de mano","stock":2,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":30,"nombre":"pulijet","stock":2,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":31,"nombre":"desinfectante instrumentos","stock":1,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":32,"nombre":"vasos cartón","stock":4,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":33,"nombre":"toallin","stock":12,"minimo":3,"categoria":"Protección y Desechables","unidad":"uds"},{"id":34,"nombre":"mascarillas negras","stock":6,"minimo":3,"categoria":"Protección y Desechables","unidad":"uds"},{"id":35,"nombre":"mascarillas azules","stock":2,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":36,"nombre":"carpules artinibsa","stock":7,"minimo":3,"categoria":"Anestesia","unidad":"uds"},{"id":37,"nombre":"carpules mepivacaina","stock":3,"minimo":2,"categoria":"Anestesia","unidad":"uds"},{"id":38,"nombre":"carpules lidocaina con epinefrina","stock":7,"minimo":3,"categoria":"Anestesia","unidad":"uds"},{"id":39,"nombre":"aguja corta","stock":2,"minimo":2,"categoria":"Anestesia","unidad":"uds"},{"id":40,"nombre":"aguja larga","stock":1,"minimo":2,"categoria":"Anestesia","unidad":"uds"},{"id":41,"nombre":"rollos de algodón","stock":3,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":42,"nombre":"jeringas 5 ml","stock":150,"minimo":20,"categoria":"Protección y Desechables","unidad":"uds"},{"id":43,"nombre":"jeringas 10ml rojas","stock":45,"minimo":10,"categoria":"Protección y Desechables","unidad":"uds"},{"id":44,"nombre":"jeringas 10 ml azules","stock":50,"minimo":10,"categoria":"Protección y Desechables","unidad":"uds"},{"id":45,"nombre":"bisturí desechable","stock":3,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":46,"nombre":"optragate","stock":75,"minimo":10,"categoria":"Endodoncia","unidad":"uds"},{"id":47,"nombre":"esponjas endo","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":48,"nombre":"dura liner II","stock":0,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":49,"nombre":"dique de goma","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":50,"nombre":"relix unicem","stock":3,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":51,"nombre":"ufigel P","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":52,"nombre":"visco gel","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":53,"nombre":"Ah plus jet","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":54,"nombre":"kooliner","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":55,"nombre":"structur A3","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":56,"nombre":"opalescence endo","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":57,"nombre":"structur A2","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":58,"nombre":"i bond adhesivo orto","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":59,"nombre":"porta babero","stock":3,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":60,"nombre":"fundas protectores periapical","stock":1,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":61,"nombre":"abreboca de goma","stock":7,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":62,"nombre":"gelatamp","stock":2,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":63,"nombre":"conlight","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":64,"nombre":"clearfil adhesivo en 2 pasos","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":65,"nombre":"ácido ortofosforico","stock":3,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":66,"nombre":"panavia clear","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":67,"nombre":"papa caries","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":68,"nombre":"pasta de impresión","stock":0,"minimo":2,"categoria":"Impresiones y Prótesis","unidad":"uds"},{"id":69,"nombre":"zir clean","stock":2,"minimo":2,"categoria":"Esterilización e Higiene","unidad":"uds"},{"id":70,"nombre":"puntas de irrigación dentsplay sirona","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":71,"nombre":"temp bond","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":72,"nombre":"temp bond ne","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":73,"nombre":"structur A1","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":74,"nombre":"ketac","stock":3,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":75,"nombre":"cybertech","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":76,"nombre":"hemostatico","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":77,"nombre":"puntas de mezclado silicona","stock":1,"minimo":2,"categoria":"Impresiones y Prótesis","unidad":"uds"},{"id":78,"nombre":"puntas de mezclado de structur","stock":2,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":79,"nombre":"puntas de mezclado luxatemp","stock":0,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":80,"nombre":"pasta profilactica","stock":1,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":81,"nombre":"silano","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":82,"nombre":"luxatemp","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":83,"nombre":"seda dental","stock":4,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":84,"nombre":"ácido hidrofluorhidrico","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":85,"nombre":"opaldam","stock":3,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":86,"nombre":"automatrix MT","stock":1,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":87,"nombre":"automatrix NR","stock":1,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":88,"nombre":"alambre plano de retenedores","stock":2,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":89,"nombre":"transbond","stock":3,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":90,"nombre":"clip flow","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":91,"nombre":"variolink light","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":92,"nombre":"variolink natural","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":93,"nombre":"multilink prueba transparente","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":94,"nombre":"hurricaine anestésico tópico","stock":1,"minimo":2,"categoria":"Anestesia","unidad":"uds"},{"id":95,"nombre":"ligas intermaxilares 1/8","stock":1,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":96,"nombre":"ligas intermaxilares 3/16","stock":1,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":97,"nombre":"ligas intermaxilares 1/4","stock":1,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":98,"nombre":"ligas intermaxilares 5/16","stock":2,"minimo":2,"categoria":"Ortodoncia","unidad":"uds"},{"id":99,"nombre":"papel articular","stock":1,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":100,"nombre":"espejos","stock":2,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":101,"nombre":"sondas exploradores","stock":9,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":102,"nombre":"tiras de pulido","stock":4,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":103,"nombre":"racestyptine retracción gingival","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":104,"nombre":"microbrush","stock":3,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":105,"nombre":"ultracal hidróxido de calcio","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":106,"nombre":"forendo","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":107,"nombre":"torcidas de algodón","stock":1,"minimo":2,"categoria":"Protección y Desechables","unidad":"uds"},{"id":108,"nombre":"flow para relleno spark","stock":4,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":109,"nombre":"edta","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":110,"nombre":"fluoroseal hidróxido de calcio","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":111,"nombre":"cepillos de profilaxis","stock":35,"minimo":10,"categoria":"Instrumental","unidad":"uds"},{"id":112,"nombre":"gutasol","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":113,"nombre":"hemocor","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":114,"nombre":"postes de fibra de vidrio","stock":2,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":115,"nombre":"thermafil F2","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":116,"nombre":"matriz dentada","stock":1,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":117,"nombre":"lijas interproximales metalicas","stock":3,"minimo":2,"categoria":"Instrumental","unidad":"uds"},{"id":118,"nombre":"limas 15 proclinic","stock":5,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":119,"nombre":"limas 25 k files","stock":21,"minimo":5,"categoria":"Endodoncia","unidad":"uds"},{"id":120,"nombre":"limas 15 k files","stock":6,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":121,"nombre":"limas 10 hedstrom","stock":12,"minimo":5,"categoria":"Endodoncia","unidad":"uds"},{"id":122,"nombre":"ensanchadores 15 k reamers","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":123,"nombre":"lima 20","stock":31,"minimo":5,"categoria":"Endodoncia","unidad":"uds"},{"id":124,"nombre":"lima 55 k file","stock":12,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":125,"nombre":"lima 50 k file","stock":6,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":126,"nombre":"lima 50 Henry shein","stock":6,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":127,"nombre":"limas 45","stock":7,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":128,"nombre":"lima 40 dentsplay","stock":3,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":129,"nombre":"limas 30 dentsplay","stock":12,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":130,"nombre":"limas 70 dentsplay","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":131,"nombre":"limas 35","stock":12,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":132,"nombre":"limas 2da serie","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":133,"nombre":"limas 1ra serie","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":134,"nombre":"limas rotatorias F3 31mm","stock":5,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":135,"nombre":"limas rotatoria F2 31 mm","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":136,"nombre":"limas rotatorias F1 31 mm","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":137,"nombre":"limas rotatorias S2 31 mm","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":138,"nombre":"limas rotatorias S1 31 mm","stock":0,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":139,"nombre":"tira nervio 2da serie","stock":1,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":140,"nombre":"Gates #1","stock":10,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":141,"nombre":"Gates #2","stock":10,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":142,"nombre":"Gates #3","stock":0,"minimo":3,"categoria":"Endodoncia","unidad":"uds"},{"id":143,"nombre":"Gates #4","stock":2,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":144,"nombre":"Gates #5","stock":3,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":145,"nombre":"peeso #1","stock":6,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":146,"nombre":"peeso #2","stock":6,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":147,"nombre":"peeso #3","stock":6,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":148,"nombre":"peeso #4","stock":0,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":149,"nombre":"peeso #5","stock":0,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":150,"nombre":"lentulo 002","stock":3,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":151,"nombre":"lentulo 003","stock":3,"minimo":2,"categoria":"Endodoncia","unidad":"uds"},{"id":152,"nombre":"heliobond","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":153,"nombre":"adhesivo 3M","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":154,"nombre":"primer panavia","stock":1,"minimo":2,"categoria":"Cementos y Temporales","unidad":"uds"},{"id":155,"nombre":"luna 2 bpa free","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":156,"nombre":"tetric flow A3","stock":13,"minimo":3,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":157,"nombre":"tetric flow A2","stock":7,"minimo":3,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":158,"nombre":"tetric flow A3,5","stock":6,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":159,"nombre":"tetric flow 1","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":160,"nombre":"compo provisional","stock":3,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":161,"nombre":"composite A1","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":162,"nombre":"composite A2","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":163,"nombre":"composite A3.5","stock":2,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":164,"nombre":"unique","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":165,"nombre":"compo estético A1","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":166,"nombre":"compo estético A2","stock":1,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":167,"nombre":"compo estético A3","stock":0,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":168,"nombre":"compo estético A3,5","stock":0,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":169,"nombre":"composite A3","stock":0,"minimo":2,"categoria":"Composite y Adhesivos","unidad":"uds"},{"id":170,"nombre":"arkansas redondas micromotor","stock":12,"minimo":3,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":171,"nombre":"arkansas redondas","stock":20,"minimo":5,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":172,"nombre":"arkansas redondas llama","stock":20,"minimo":5,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":173,"nombre":"arkansas llama chata","stock":21,"minimo":5,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":174,"nombre":"arkansas llama punta","stock":28,"minimo":5,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":175,"nombre":"fresa odontoseccion 979-2599","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":176,"nombre":"fresa tungsteno micromotor 979-5046","stock":6,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":177,"nombre":"fresa redonda pequeña verde 6801314009","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":178,"nombre":"fresa tallado 850314014","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":179,"nombre":"fresa redonda pequeña 801314009","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":180,"nombre":"fresa cilíndrica 846314016","stock":2,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":181,"nombre":"fresa cilíndrica chata 807314010","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":182,"nombre":"fresa redonda pequeña 801314008","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":183,"nombre":"fresa redonda grande verde 6801314016","stock":4,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":184,"nombre":"fresa redonda verde micromotor h1se204012","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":185,"nombre":"fresa de tallado verde 6850314014","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":186,"nombre":"fresa redonda de carburo micromotor H1204016","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":187,"nombre":"fresa redonda de carburo micromotor H1204018","stock":2,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":188,"nombre":"fresa de rugby verde 6368314016","stock":2,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":189,"nombre":"fresa redonda tallo largo 801L314016","stock":9,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":190,"nombre":"fresa tumbapuente H4MCL314010","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":191,"nombre":"fresa tumbapuente H22AGK314016","stock":4,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":192,"nombre":"fresa redonda de carburo micromotor H1204006","stock":8,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":193,"nombre":"fresa redonda de carburo micromotor H1204008","stock":10,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":194,"nombre":"fresa redonda de carburo micromotor H1204010","stock":10,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":195,"nombre":"fresa redonda de carburo micromotor H1SE204010","stock":10,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":196,"nombre":"fresa redonda de carburo micromotor H1SE204012","stock":8,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":197,"nombre":"fresa redonda de carburo micromotor H1SE204014","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":198,"nombre":"fresa redonda verde 6801314016","stock":10,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":199,"nombre":"fresa redonda 801314010","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":200,"nombre":"fresa redonda 801314014","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":201,"nombre":"fresa tumbapuente H4MCL314012","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":202,"nombre":"fresa redonda azul 9792064","stock":16,"minimo":3,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":203,"nombre":"fresa redonda tallo largo verde 9792066","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":204,"nombre":"fresa quirúrgica fina H254314010","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":205,"nombre":"fresa endo Z H269GK314016","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":206,"nombre":"fresa cortar metal FGTC1958","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":207,"nombre":"fresa quirúrgica fina tallo largo H254LE314012","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":208,"nombre":"fresa cortar metal E015337101200","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":209,"nombre":"fresa de lanza rojo","stock":3,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":210,"nombre":"fresa redonda tallo largo azul 801L016M","stock":15,"minimo":3,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":211,"nombre":"fresa tumbapuente H4MCXXL314014","stock":2,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":212,"nombre":"fresa rugby verde 9792030","stock":2,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":213,"nombre":"fresa rugby azul 9792029","stock":1,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":214,"nombre":"hoja de bisturí no 15","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":215,"nombre":"fresa de pulir zirconio Z141014ZRT","stock":30,"minimo":5,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":216,"nombre":"fresa de pulir zirconio cilíndrica FGZ850018","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":217,"nombre":"fresa de pulir zirconio rugby FGZ379018","stock":5,"minimo":2,"categoria":"Fresas y Puntas","unidad":"uds"},{"id":218,"nombre":"sutura 2/0","stock":2,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":219,"nombre":"sutura 3/0","stock":2,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":220,"nombre":"sutura 4/0","stock":2,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":221,"nombre":"sutura reabsorbible 4/0","stock":2,"minimo":2,"categoria":"Cirugía","unidad":"uds"},{"id":222,"nombre":"sutura reabsorbible 5/0","stock":1,"minimo":2,"categoria":"Cirugía","unidad":"uds"}];
+
+const CAT_ICONS = {
+  'Protección y Desechables': '🧤',
+  'Esterilización e Higiene': '🧴',
+  'Anestesia': '💉',
+  'Endodoncia': '🔧',
+  'Composite y Adhesivos': '🔵',
+  'Impresiones y Prótesis': '🦷',
+  'Ortodoncia': '📎',
+  'Cirugía': '🔪',
+  'Fresas y Puntas': '🔩',
+  'Cementos y Temporales': '🏺',
+  'Instrumental': '🩺',
+};
+const CAT_COLORS = {
+  'Protección y Desechables': '#3B82F6',
+  'Esterilización e Higiene': '#10B981',
+  'Anestesia': '#8B5CF6',
+  'Endodoncia': '#F59E0B',
+  'Composite y Adhesivos': '#06B6D4',
+  'Impresiones y Prótesis': '#EC4899',
+  'Ortodoncia': '#6366F1',
+  'Cirugía': '#EF4444',
+  'Fresas y Puntas': '#84CC16',
+  'Cementos y Temporales': '#F97316',
+  'Instrumental': '#64748B',
+};
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let state = {
+  products: [],
+  categories: [],
+  compraList: [],
+  history: [],
+  quickIds: [3,4,34,13,36,14,39,104],  // default quick access IDs
+  currentTab: 'inicio',
+  activeCategory: 'Todos',
+  stockFilter: 'all',
+  searchQuery: '',
+  predHistory: [],
+};
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('avancedental_v2');
+    if (saved) {
+      const s = JSON.parse(saved);
+      state.products = s.products || INITIAL_PRODUCTS;
+      state.categories = s.categories || Object.keys(CAT_ICONS);
+      state.compraList = s.compraList || [];
+      state.history = s.history || [];
+      state.quickIds = s.quickIds || [3,4,34,13,36,14,39,104];
+      state.predHistory = s.predHistory || [];
+    } else {
+      state.products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+      state.categories = Object.keys(CAT_ICONS);
+    }
+    // Ensure all categories present
+    state.products.forEach(p => {
+      if (!state.categories.includes(p.categoria)) state.categories.push(p.categoria);
+    });
+  } catch(e) {
+    state.products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+    state.categories = Object.keys(CAT_ICONS);
+  }
+}
+
+function saveState() {
+  localStorage.setItem('avancedental_v2', JSON.stringify({
+    products: state.products,
+    categories: state.categories,
+    compraList: state.compraList,
+    history: state.history,
+    quickIds: state.quickIds,
+    predHistory: state.predHistory,
+  }));
+}
+
+// ═══════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════
+function getStatus(p) {
+  if (p.stock === 0) return 'out';
+  if (p.stock <= p.minimo) return 'low';
+  return 'ok';
+}
+function getStatusLabel(s) { return s==='out'?'🔴':s==='low'?'🟡':'🟢'; }
+function nextId() { return Math.max(0, ...state.products.map(p=>p.id)) + 1; }
+
+function addToHistory(type, product, qty) {
+  state.history.unshift({
+    type, productId: product.id, productName: product.nombre,
+    qty, stock: product.stock,
+    ts: Date.now()
+  });
+  if (state.history.length > 200) state.history = state.history.slice(0, 200);
+}
+
+function addToCompra(product, qty) {
+  const existing = state.compraList.find(c => c.productId === product.id && !c.done);
+  if (existing) {
+    existing.qty += qty;
+    existing.ts = Date.now();
+  } else {
+    state.compraList.unshift({
+      id: Date.now(),
+      productId: product.id,
+      productName: product.nombre,
+      categoria: product.categoria,
+      qty: qty,
+      stockAtTime: product.stock,
+      done: false,
+      ts: Date.now()
+    });
+  }
+}
+
+function toast(msg, duration=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('es-ES', {day:'2-digit',month:'2-digit'}) + ' ' +
+    d.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+}
+
+// ═══════════════════════════════════════
+//  RENDER: MAIN
+// ═══════════════════════════════════════
+function renderAll() {
+  renderHeader();
+  renderQuickAccess();
+  renderCategoryFilter();
+  renderProductList();
+  renderAlerts();
+  renderCompra();
+  renderBadges();
+  updateSettings();
+}
+
+function renderHeader() {
+  const alerts = state.products.filter(p => getStatus(p) !== 'ok');
+  document.getElementById('inv-sub').textContent = `${state.products.length} productos · ${alerts.length} alertas`;
+  const banner = document.getElementById('alertBanner');
+  if (alerts.length > 0) {
+    banner.style.display = 'flex';
+    const out = state.products.filter(p => p.stock === 0).length;
+    const low = state.products.filter(p => p.stock > 0 && p.stock <= p.minimo).length;
+    document.getElementById('alertBannerTitle').textContent =
+      `${out > 0 ? out + ' agotados' : ''}${out>0&&low>0?', ':''}${low>0?low+' bajo mínimo':''}`;
+    document.getElementById('alertBannerSub').textContent = 'Pulsa para ver · están en la lista de compra';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function renderQuickAccess() {
+  const grid = document.getElementById('quickGrid');
+  grid.innerHTML = '';
+  state.quickIds.forEach(id => {
+    const p = state.products.find(x => x.id === id);
+    if (!p) return;
+    const s = getStatus(p);
+    const icon = CAT_ICONS[p.categoria] || '📦';
+    const el = document.createElement('div');
+    el.className = 'quick-btn';
+    el.onclick = () => openUseModal(p.id);
+    el.innerHTML = `
+      <div class="quick-btn-icon">${icon}</div>
+      <div class="quick-btn-name">${p.nombre}</div>
+      <div class="quick-btn-stock ${s}">${p.stock} uds</div>`;
+    grid.appendChild(el);
+  });
+}
+
+function renderCategoryFilter() {
+  const container = document.getElementById('catScroll');
+  container.innerHTML = '';
+  const cats = ['Todos', ...state.categories.filter(c => state.products.some(p=>p.categoria===c))];
+  cats.forEach(cat => {
+    const el = document.createElement('div');
+    el.className = 'cat-chip' + (state.activeCategory === cat ? ' active' : '');
+    const count = cat === 'Todos' ? state.products.length : state.products.filter(p=>p.categoria===cat).length;
+    el.textContent = `${CAT_ICONS[cat]||''} ${cat} (${count})`;
+    el.onclick = () => { state.activeCategory = cat; renderCategoryFilter(); renderProductList(); };
+    container.appendChild(el);
+  });
+}
+
+function getFilteredProducts() {
+  let list = state.products;
+  if (state.activeCategory !== 'Todos') list = list.filter(p => p.categoria === state.activeCategory);
+  if (state.stockFilter === 'alert') list = list.filter(p => p.stock === 0);
+  else if (state.stockFilter === 'warn') list = list.filter(p => p.stock > 0 && p.stock <= p.minimo);
+  else if (state.stockFilter === 'ok') list = list.filter(p => p.stock > p.minimo);
+  if (state.searchQuery) {
+    const q = state.searchQuery.toLowerCase();
+    list = list.filter(p => p.nombre.toLowerCase().includes(q) || p.categoria.toLowerCase().includes(q));
+  }
+  return list;
+}
+
+function highlightText(text, query) {
+  if (!query) return text;
+  const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+  return text.replace(re, '<mark class="highlight">$1</mark>');
+}
+
+function renderProductList() {
+  const list = document.getElementById('productList');
+  const filtered = getFilteredProducts();
+  list.innerHTML = '';
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="no-results"><div style="font-size:40px;margin-bottom:8px">🔍</div><div style="color:var(--text3)">Sin resultados</div></div>`;
+    return;
+  }
+  // Sort: alerts first
+  filtered.sort((a,b) => {
+    const sa = getStatus(a), sb = getStatus(b);
+    const order = {out:0,low:1,ok:2};
+    return order[sa]-order[sb];
+  });
+  filtered.forEach(p => {
+    const s = getStatus(p);
+    const card = document.createElement('div');
+    card.className = `product-card ${s==='out'?'alert-row':s==='low'?'warn-row':''}`;
+    card.onclick = () => openDetailModal(p.id);
+    card.innerHTML = `
+      <div class="product-info">
+        <div class="product-name">${highlightText(p.nombre, state.searchQuery)}</div>
+        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${p.categoria}</div>
+      </div>
+      <div class="product-stock-area">
+        <div class="stock-badge ${s}">${p.stock}</div>
+        <button class="use-btn" onclick="event.stopPropagation();openUseModal(${p.id})" ${p.stock===0?'disabled':''} title="Usar unidad">−</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alertList');
+  const alerts = state.products.filter(p => getStatus(p) !== 'ok')
+    .sort((a,b) => a.stock - b.stock);
+  document.getElementById('alerts-sub').textContent = `${alerts.length} productos con stock bajo`;
+  list.innerHTML = '';
+  if (alerts.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Todo en orden</div><div class="empty-state-sub">Todos los productos están sobre el mínimo</div></div>`;
+    return;
+  }
+  alerts.forEach(p => {
+    const s = getStatus(p);
+    const card = document.createElement('div');
+    card.className = `product-card ${s==='out'?'alert-row':'warn-row'}`;
+    card.onclick = () => openDetailModal(p.id);
+    card.innerHTML = `
+      <div class="product-info">
+        <div class="product-name">${p.nombre}</div>
+        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${p.categoria} · mín. ${p.minimo}</div>
+      </div>
+      <div class="product-stock-area">
+        <div class="stock-badge ${s}">${p.stock}</div>
+        <button class="use-btn" onclick="event.stopPropagation();openAddStockModal(${p.id})" style="background:var(--green);box-shadow:0 2px 8px rgba(22,163,74,0.3)" title="Añadir stock">＋</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function renderCompra() {
+  const list = document.getElementById('compraList');
+  const stats = document.getElementById('compraStats');
+
+  // Auto-add products below minimum
+  state.products.filter(p => p.stock <= p.minimo).forEach(p => {
+    if (!state.compraList.find(c => c.productId === p.id && !c.done)) {
+      const needed = Math.max(p.minimo * 2 - p.stock, p.minimo);
+      state.compraList.push({
+        id: Date.now() + p.id,
+        productId: p.id, productName: p.nombre,
+        categoria: p.categoria, qty: needed,
+        stockAtTime: p.stock, done: false, ts: Date.now()
+      });
+    }
+  });
+
+  const pending = state.compraList.filter(c => !c.done);
+  const done = state.compraList.filter(c => c.done);
+  document.getElementById('compras-sub').textContent = `${pending.length} pendientes · ${done.length} completados`;
+  document.getElementById('compraTabBadge').dataset.count = pending.length;
+
+  stats.innerHTML = `
+    <div class="stat-card"><div class="stat-num">${state.compraList.length}</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--amber)">${pending.length}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${done.length}</div><div class="stat-label">Completados</div></div>`;
+
+  list.innerHTML = '';
+  if (state.compraList.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🛒</div><div class="empty-state-title">Lista vacía</div><div class="empty-state-sub">Se llena automáticamente al usar productos</div></div>`;
+    return;
+  }
+
+  // Sort: pending first
+  const sorted = [...pending, ...done];
+  sorted.forEach(item => {
+    const el = document.createElement('div');
+    el.className = `compra-item${item.done?' done':''}`;
+    el.innerHTML = `
+      <div class="compra-check ${item.done?'checked':''}" onclick="toggleCompraItem(${item.id})">
+        ${item.done?'✓':''}
+      </div>
+      <div class="compra-info">
+        <div class="compra-name">${item.productName}</div>
+        <div class="compra-detail">${CAT_ICONS[item.categoria]||'📦'} ${item.categoria} · Stock al pedir: ${item.stockAtTime}</div>
+      </div>
+      <div class="compra-qty">×${item.qty}</div>`;
+    list.appendChild(el);
+  });
+}
+
+function renderBadges() {
+  const alerts = state.products.filter(p => getStatus(p) !== 'ok').length;
+  document.getElementById('alertTabBadge').dataset.count = alerts;
+  document.getElementById('compraTabBadge').dataset.count = state.compraList.filter(c=>!c.done).length;
+}
+
+function updateSettings() {
+  document.getElementById('catCount').textContent = `${state.categories.length} categorías`;
+  document.getElementById('histCount').textContent = `${state.history.length} movimientos`;
+}
+
+// ═══════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════
+function showTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  state.currentTab = tab;
+  document.getElementById('main').scrollTop = 0;
+  if (tab === 'compras') renderCompra();
+  if (tab === 'alertas') renderAlerts();
+}
+
+// ═══════════════════════════════════════
+//  SEARCH
+// ═══════════════════════════════════════
+function onSearch(input) {
+  state.searchQuery = input.value.trim();
+  document.getElementById('searchClear').classList.toggle('show', state.searchQuery.length > 0);
+  renderProductList();
+}
+function clearSearch() {
+  const inp = document.getElementById('searchInput');
+  inp.value = ''; state.searchQuery = '';
+  document.getElementById('searchClear').classList.remove('show');
+  inp.focus();
+  renderProductList();
+}
+function setStockFilter(f, el) {
+  state.stockFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderProductList();
+}
+
+// ═══════════════════════════════════════
+//  MODAL: DETAIL
+// ═══════════════════════════════════════
+let currentProductId = null;
+
+function openDetailModal(id) {
+  currentProductId = id;
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  const s = getStatus(p);
+  document.getElementById('detailName').textContent = p.nombre;
+  document.getElementById('detailCat').textContent = `${CAT_ICONS[p.categoria]||''} ${p.categoria}`;
+  document.getElementById('detailStock').textContent = p.stock;
+  document.getElementById('detailStock').className = `detail-stock-num ${s}`;
+  document.getElementById('detailMin').textContent = p.minimo;
+
+  // History for this product
+  const hist = state.history.filter(h => h.productId === id).slice(0,5);
+  const rows = document.getElementById('detailRows');
+  rows.innerHTML = `
+    <div class="detail-row"><span class="detail-row-label">Estado</span><span class="detail-row-val">${getStatusLabel(s)} ${s==='out'?'Agotado':s==='low'?'Bajo mínimo':'Correcto'}</span></div>
+    <div class="detail-row"><span class="detail-row-label">Movimientos recientes</span><span class="detail-row-val">${hist.length}</span></div>
+    ${hist.length>0?'<div style="margin-top:8px">'+hist.map(h=>`<div class="log-entry"><div class="log-dot ${h.type}"></div><div class="log-text">${h.type==='use'?'−':'+'} ${h.qty} uds</div><div class="log-time">${formatTime(h.ts)}</div></div>`).join('')+'</div>':''}`;
+
+  document.getElementById('detailActions').innerHTML = `
+    <button class="btn-secondary" style="flex:1" onclick="closeModal('modalDetail');openAddStockModal(${id})">＋ Recibir pedido</button>
+    <button class="btn-primary" onclick="closeModal('modalDetail');openUseModal(${id})" ${p.stock===0?'disabled':''}>− Usar</button>
+    <button class="icon-btn" onclick="closeModal('modalDetail');openEditModal(${id})" title="Editar">✏️</button>`;
+
+  openModal('modalDetail');
+}
+
+// ═══════════════════════════════════════
+//  MODAL: USE
+// ═══════════════════════════════════════
+let useQty = 1;
+function openUseModal(id) {
+  currentProductId = id;
+  useQty = 1;
+  const p = state.products.find(x => x.id === id);
+  if (!p || p.stock === 0) { toast('❌ Sin stock disponible'); return; }
+  document.getElementById('useName').textContent = p.nombre;
+  document.getElementById('useCat').textContent = `${CAT_ICONS[p.categoria]||''} ${p.categoria}`;
+  document.getElementById('useQtyVal').textContent = '1';
+  document.getElementById('useCurrentStock').textContent = p.stock;
+  openModal('modalUse');
+}
+function changeUseQty(delta) {
+  const p = state.products.find(x => x.id === currentProductId);
+  useQty = Math.max(1, Math.min(p.stock, useQty + delta));
+  document.getElementById('useQtyVal').textContent = useQty;
+}
+function confirmUse() {
+  const p = state.products.find(x => x.id === currentProductId);
+  if (!p) return;
+  p.stock = Math.max(0, p.stock - useQty);
+  addToHistory('use', p, useQty);
+  addToCompra(p, useQty);
+  saveState();
+  closeModal('modalUse');
+  renderAll();
+  toast(`✅ −${useQty} ${p.nombre}`);
+}
+
+// ═══════════════════════════════════════
+//  MODAL: ADD STOCK
+// ═══════════════════════════════════════
+let addQty = 1;
+function openAddStockModal(id) {
+  currentProductId = id;
+  addQty = 1;
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('addName').textContent = p.nombre;
+  document.getElementById('addCat').textContent = `${CAT_ICONS[p.categoria]||''} ${p.categoria}`;
+  document.getElementById('addQtyVal').textContent = '1';
+  openModal('modalAdd');
+}
+function changeAddQty(delta) {
+  addQty = Math.max(1, addQty + delta);
+  document.getElementById('addQtyVal').textContent = addQty;
+}
+function confirmAdd() {
+  const p = state.products.find(x => x.id === currentProductId);
+  if (!p) return;
+  p.stock += addQty;
+  addToHistory('add', p, addQty);
+  // Mark compra as done if enough stock
+  state.compraList.filter(c => c.productId === p.id && !c.done).forEach(c => {
+    if (p.stock > p.minimo) c.done = true;
+  });
+  saveState();
+  closeModal('modalAdd');
+  renderAll();
+  toast(`✅ +${addQty} ${p.nombre} · Stock: ${p.stock}`);
+}
+
+// ═══════════════════════════════════════
+//  MODAL: NEW PRODUCT
+// ═══════════════════════════════════════
+function openAddProduct() {
+  document.getElementById('newProdName').value = '';
+  document.getElementById('newProdStock').value = '0';
+  document.getElementById('newProdMin').value = '2';
+  const sel = document.getElementById('newProdCat');
+  sel.innerHTML = state.categories.map(c => `<option value="${c}">${CAT_ICONS[c]||''} ${c}</option>`).join('');
+  openModal('modalNewProduct');
+  setTimeout(() => document.getElementById('newProdName').focus(), 300);
+}
+function confirmNewProduct() {
+  const nombre = document.getElementById('newProdName').value.trim();
+  if (!nombre) { toast('⚠️ Escribe un nombre'); return; }
+  const prod = {
+    id: nextId(),
+    nombre: nombre.toLowerCase(),
+    stock: parseInt(document.getElementById('newProdStock').value) || 0,
+    minimo: parseInt(document.getElementById('newProdMin').value) || 2,
+    categoria: document.getElementById('newProdCat').value,
+    unidad: 'uds'
+  };
+  state.products.push(prod);
+  saveState();
+  closeModal('modalNewProduct');
+  renderAll();
+  toast(`✅ Producto añadido: ${prod.nombre}`);
+}
+
+// ═══════════════════════════════════════
+//  MODAL: EDIT PRODUCT
+// ═══════════════════════════════════════
+function openEditModal(id) {
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('editProdId').value = id;
+  document.getElementById('editProdName').value = p.nombre;
+  document.getElementById('editProdStock').value = p.stock;
+  document.getElementById('editProdMin').value = p.minimo;
+  const sel = document.getElementById('editProdCat');
+  sel.innerHTML = state.categories.map(c => `<option value="${c}" ${c===p.categoria?'selected':''}>${CAT_ICONS[c]||''} ${c}</option>`).join('');
+  openModal('modalEdit');
+}
+function confirmEdit() {
+  const id = parseInt(document.getElementById('editProdId').value);
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  p.nombre = document.getElementById('editProdName').value.trim() || p.nombre;
+  p.stock = parseInt(document.getElementById('editProdStock').value) || 0;
+  p.minimo = parseInt(document.getElementById('editProdMin').value) || 2;
+  p.categoria = document.getElementById('editProdCat').value;
+  saveState();
+  closeModal('modalEdit');
+  renderAll();
+  toast('✅ Producto actualizado');
+}
+function deleteProduct() {
+  const id = parseInt(document.getElementById('editProdId').value);
+  if (!confirm('¿Eliminar este producto del inventario?')) return;
+  state.products = state.products.filter(x => x.id !== id);
+  state.quickIds = state.quickIds.filter(x => x !== id);
+  saveState();
+  closeModal('modalEdit');
+  renderAll();
+  toast('🗑 Producto eliminado');
+}
+
+// ═══════════════════════════════════════
+//  MODAL: CATEGORIES
+// ═══════════════════════════════════════
+function openManageCategories() {
+  renderCatList();
+  openModal('modalCats');
+}
+function renderCatList() {
+  const list = document.getElementById('catList');
+  list.innerHTML = state.categories.map(c => {
+    const count = state.products.filter(p => p.categoria === c).length;
+    return `<div class="detail-row">
+      <span>${CAT_ICONS[c]||'📁'} ${c} <small style="color:var(--text3)">(${count})</small></span>
+      <button onclick="deleteCategory('${c}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
+    </div>`;
+  }).join('');
+}
+function addCategory() {
+  const val = document.getElementById('newCatInput').value.trim();
+  if (!val) return;
+  if (!state.categories.includes(val)) {
+    state.categories.push(val);
+    saveState();
+    renderCatList();
+    renderCategoryFilter();
+    document.getElementById('catCount').textContent = `${state.categories.length} categorías`;
+  }
+  document.getElementById('newCatInput').value = '';
+  toast(`✅ Categoría añadida: ${val}`);
+}
+function deleteCategory(cat) {
+  const count = state.products.filter(p => p.categoria === cat).length;
+  if (count > 0) { toast(`⚠️ Hay ${count} productos en esta categoría`); return; }
+  state.categories = state.categories.filter(c => c !== cat);
+  saveState();
+  renderCatList();
+  renderCategoryFilter();
+}
+
+// ═══════════════════════════════════════
+//  COMPRA
+// ═══════════════════════════════════════
+function toggleCompraItem(id) {
+  const item = state.compraList.find(c => c.id === id);
+  if (item) { item.done = !item.done; saveState(); renderCompra(); }
+}
+function clearCompra() {
+  if (!confirm('¿Eliminar los ítems completados?')) return;
+  state.compraList = state.compraList.filter(c => !c.done);
+  saveState(); renderCompra();
+  toast('🗑 Completados eliminados');
+}
+function exportCompra() {
+  const pending = state.compraList.filter(c => !c.done);
+  if (pending.length === 0) { toast('⚠️ Lista vacía'); return; }
+  let txt = `LISTA DE COMPRA — AVANCE DENTAL\n${new Date().toLocaleDateString('es-ES')}\n${'─'.repeat(40)}\n\n`;
+  const byCat = {};
+  pending.forEach(item => {
+    if (!byCat[item.categoria]) byCat[item.categoria] = [];
+    byCat[item.categoria].push(item);
+  });
+  Object.entries(byCat).forEach(([cat, items]) => {
+    txt += `${cat.toUpperCase()}\n`;
+    items.forEach(i => txt += `  □ ${i.productName} — ${i.qty} uds\n`);
+    txt += '\n';
+  });
+  const blob = new Blob([txt], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `compra_avancedental_${new Date().toISOString().split('T')[0]}.txt`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('📤 Lista exportada');
+}
+
+// ═══════════════════════════════════════
+//  PREDICCION
+// ═══════════════════════════════════════
+function processPacientes(input) {
+  const file = input.files[0];
+  if (!file) return;
+  // Read as text/CSV or just count rows as simple prediction
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const text = e.target.result;
+      const lines = text.split('\n').filter(l => l.trim()).length;
+      const patients = Math.max(lines - 1, 1); // subtract header
+      generatePrediction(patients, file.name);
+    } catch(err) {
+      // If it's xlsx, just use a placeholder
+      generatePrediction(400, file.name);
+    }
+  };
+  reader.onerror = () => generatePrediction(400, file.name);
+  if (file.name.endsWith('.csv')) {
+    reader.readAsText(file, 'utf-8');
+  } else {
+    // XLSX: estimate from file size
+    const estimated = Math.round(file.size / 120);
+    generatePrediction(Math.max(estimated, 50), file.name);
+  }
+  input.value = '';
+}
+
+function generatePrediction(patients, filename) {
+  // Consumption rates per patient (empirical dental averages)
+  const rates = [
+    {categoria:'Protección y Desechables', nombre:'Guantes (pares)', rate: 8},
+    {categoria:'Protección y Desechables', nombre:'Mascarillas', rate: 6},
+    {categoria:'Protección y Desechables', nombre:'Baberos', rate: 2.5},
+    {categoria:'Anestesia', nombre:'Carpules', rate: 1.8},
+    {categoria:'Anestesia', nombre:'Agujas', rate: 1.8},
+    {categoria:'Esterilización e Higiene', nombre:'Bolsas esterilización', rate: 3.5},
+    {categoria:'Composite y Adhesivos', nombre:'Microbrush', rate: 1.2},
+    {categoria:'Endodoncia', nombre:'Limas (uso endodoncia ≈30%)', rate: 0.4},
+    {categoria:'Protección y Desechables', nombre:'Eyectores', rate: 2},
+    {categoria:'Protección y Desechables', nombre:'Vasos', rate: 1.5},
+  ];
+
+  const weeksInMonth = 4.3;
+  const results = rates.map(r => ({
+    ...r,
+    monthly: Math.ceil(patients * r.rate / 100),
+    weekly: Math.ceil(patients * r.rate / 100 / weeksInMonth),
+  }));
+
+  const record = {
+    id: Date.now(),
+    filename, patients,
+    date: new Date().toLocaleDateString('es-ES'),
+    results
+  };
+  state.predHistory.unshift(record);
+  if (state.predHistory.length > 6) state.predHistory = state.predHistory.slice(0,6);
+  saveState();
+  renderPrediction();
+  toast(`📊 Predicción generada para ${patients} pacientes`);
+}
+
+function renderPrediction() {
+  const div = document.getElementById('predResults');
+  if (state.predHistory.length === 0) { div.innerHTML = ''; return; }
+  const latest = state.predHistory[0];
+  div.innerHTML = `
+    <div class="pred-result">
+      <div class="pred-result-header">
+        <div>
+          <div class="pred-result-title">Predicción mensual</div>
+          <div style="font-size:12px;color:var(--text3)">${latest.date} · ${latest.patients} pacientes · ${latest.filename}</div>
+        </div>
+        <div class="pred-result-badge">✓ Activa</div>
+      </div>
+      ${latest.results.map(r => `
+        <div class="pred-row">
+          <span class="pred-row-name">${r.nombre}</span>
+          <span class="pred-row-val">${r.monthly}/mes · ${r.weekly}/sem</span>
+        </div>`).join('')}
+    </div>
+    ${state.predHistory.length > 1 ? `
+    <div style="margin-top:16px">
+      <div class="quick-title">Historial</div>
+      ${state.predHistory.slice(1).map(h => `
+        <div class="log-entry">
+          <div class="log-dot add"></div>
+          <div class="log-text">${h.date} · ${h.patients} pacientes</div>
+          <div class="log-time">${h.filename}</div>
+        </div>`).join('')}
+    </div>` : ''}`;
+}
+
+// ═══════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════
+function openHistory() {
+  const list = document.getElementById('historyList');
+  if (state.history.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding:30px 0"><div class="empty-state-icon">📋</div><div class="empty-state-sub">Sin movimientos aún</div></div>';
+  } else {
+    list.innerHTML = state.history.slice(0,50).map(h => `
+      <div class="log-entry">
+        <div class="log-dot ${h.type}"></div>
+        <div class="log-text"><strong>${h.type==='use'?'−':'+'} ${h.qty}</strong> ${h.productName}</div>
+        <div class="log-time">${formatTime(h.ts)}</div>
+      </div>`).join('');
+  }
+  openModal('modalHistory');
+}
+
+// ═══════════════════════════════════════
+//  MISC
+// ═══════════════════════════════════════
+function openBulkMinimos() {
+  const val = prompt('Nuevo mínimo por defecto para todos los productos (actual: 2):');
+  if (val && !isNaN(val) && parseInt(val) >= 0) {
+    const n = parseInt(val);
+    state.products.forEach(p => p.minimo = n);
+    saveState(); renderAll();
+    toast(`✅ Mínimo global actualizado a ${n}`);
+  }
+}
+
+function exportData() {
+  let csv = 'Nombre,Categoría,Stock,Mínimo\n';
+  state.products.forEach(p => {
+    csv += `"${p.nombre}","${p.categoria}",${p.stock},${p.minimo}\n`;
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `inventario_avancedental_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('📥 Inventario exportado');
+}
+
+function resetAll() {
+  state.products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+  state.categories = Object.keys(CAT_ICONS);
+  state.compraList = [];
+  state.history = [];
+  state.quickIds = [3,4,34,13,36,14,39,104];
+  state.predHistory = [];
+  saveState(); renderAll();
+  toast('🗑 Datos reseteados');
+}
+
+// ═══════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('avancedental_theme', isDark ? 'light' : 'dark');
+  document.getElementById('darkToggle').classList.toggle('on', !isDark);
+  document.getElementById('themeToggleBtn').textContent = isDark ? '🌙' : '☀️';
+}
+function loadTheme() {
+  const t = localStorage.getItem('avancedental_theme');
+  if (t === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('darkToggle').classList.add('on');
+    document.getElementById('themeToggleBtn').textContent = '☀️';
+  }
+}
+
+// ═══════════════════════════════════════
+//  MODAL HELPERS
+// ═══════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => { m.classList.remove('open'); document.body.style.overflow = ''; });
+});
+
+// ═══════════════════════════════════════
+//  DESKTOP SIDEBAR
+// ═══════════════════════════════════════
+function setupDesktop() {
+  if (window.innerWidth >= 900) {
+    const logo = document.querySelector('.desktop-logo');
+    if (logo) logo.style.display = 'block';
+  }
+}
+
+
+// ═══════════════════════════════════════
+//  JSONBIN.IO SYNC LAYER
+//  API: https://api.jsonbin.io/v3
+//  Modelo: 1 bin = todo el estado (products, compraList, categories, quickIds, history)
+//  Pull cada 30s · Push atómico en cada operación · Offline-first
+// ═══════════════════════════════════════
+
+const JSONBIN_KEY_STORAGE  = 'avancedental_jsonbin_key';
+const JSONBIN_BIN_STORAGE  = 'avancedental_jsonbin_bin';
+const JSONBIN_API          = 'https://api.jsonbin.io/v3';
+const SYNC_INTERVAL_MS     = 30000;
+
+let _jbKey     = '';  // API Key del usuario
+let _jbBinId   = '';  // ID del bin creado
+let _syncTimer = null;
+let _lastSyncTs = 0;
+let _pushing   = false;
+let _pullScheduled = false;
+
+// ── UI helpers ──────────────────────────────────────────────
+
+function setSyncState(state, label) {
+  const el  = document.getElementById('syncStatus');
+  const lbl = document.getElementById('syncLabel');
+  const bar = document.getElementById('syncBar');
+  if (!el) return;
+  el.className = state;
+  lbl.textContent = label;
+  bar.classList.toggle('syncing', state === 'syncing');
+
+  const sub    = document.getElementById('syncSettingsSub');
+  const footer = document.getElementById('syncFooter');
+  const ts     = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+
+  if (sub) {
+    const msgs = { local:'Sin configurar', ok:`Conectado · ${ts}`, error:'Error de conexión', syncing:'Sincronizando...' };
+    sub.textContent = msgs[state] || '';
+  }
+  if (footer) {
+    const fm = { local:'Datos locales', ok:'☁️ Sincronizado', error:'⚠️ Error sync', syncing:'🔄 Sync...' };
+    footer.textContent = fm[state] || '';
+  }
+}
+
+function showSyncTestResult(type, msg) {
+  const el = document.getElementById('syncTestResult');
+  el.style.display = 'block';
+  const colors = { ok:'var(--green-light)/var(--green)', error:'var(--red-light)/var(--red)', info:'var(--accent-light)/var(--accent)' };
+  el.style.background = type==='ok'?'var(--green-light)':type==='error'?'var(--red-light)':'var(--accent-light)';
+  el.style.color      = type==='ok'?'var(--green)':type==='error'?'var(--red)':'var(--accent)';
+  el.textContent = msg;
+}
+
+// ── Cargar credenciales guardadas ────────────────────────────
+
+function loadJsonbinCredentials() {
+  _jbKey   = localStorage.getItem(JSONBIN_KEY_STORAGE) || '';
+  _jbBinId = localStorage.getItem(JSONBIN_BIN_STORAGE) || '';
+  if (_jbKey && _jbBinId) {
+    setSyncState('ok', 'JSONBin');
+    const inp = document.getElementById('jsonbinKeyInput');
+    if (inp) inp.value = _jbKey;
+    const s4 = document.getElementById('step4num');
+    if (s4) s4.classList.add('done');
+  } else {
+    setSyncState('local', 'Local');
+  }
+}
+
+// ── Guardar desde el modal ───────────────────────────────────
+
+async function saveJsonbinKey() {
+  const inp = document.getElementById('jsonbinKeyInput');
+  const key = (inp ? inp.value : '').trim();
+  if (!key.startsWith('$2b$')) {
+    showSyncTestResult('error', '⚠️ La API Key debe empezar por $2b$... Cópiala exactamente desde jsonbin.io → API Keys');
+    return;
+  }
+  _jbKey = key;
+  showSyncTestResult('info', '🔄 Creando almacenamiento en la nube...');
+
+  try {
+    // Intentar crear un bin nuevo con el estado actual
+    const binId = await createBin();
+    _jbBinId = binId;
+    localStorage.setItem(JSONBIN_KEY_STORAGE, _jbKey);
+    localStorage.setItem(JSONBIN_BIN_STORAGE, _jbBinId);
+    showSyncTestResult('ok', `✅ Conectado. Bin ID: ${_jbBinId.slice(0,12)}...`);
+    setSyncState('ok', 'JSONBin');
+    const s4 = document.getElementById('step4num');
+    if (s4) s4.classList.add('done');
+    startAutoSync();
+    setTimeout(() => closeModal('modalSync'), 1800);
+  } catch(e) {
+    showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la API Key sea correcta.');
+  }
+}
+
+// ── API calls ────────────────────────────────────────────────
+
+async function createBin() {
+  const payload = buildPayload();
+  const res = await fetch(`${JSONBIN_API}/b`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': _jbKey,
+      'X-Bin-Name': 'AvanceDental-Inventario',
+      'X-Bin-Private': 'false',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.metadata.id;
+}
+
+async function pushBin() {
+  if (!_jbKey || !_jbBinId) return false;
+  if (_pushing) return false;
+  _pushing = true;
+  setSyncState('syncing', 'Sync...');
+  try {
+    const res = await fetch(`${JSONBIN_API}/b/${_jbBinId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': _jbKey,
+      },
+      body: JSON.stringify(buildPayload()),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _lastSyncTs = Date.now();
+    setSyncState('ok', 'JSONBin');
+    return true;
+  } catch(e) {
+    setSyncState('error', 'Error');
+    console.warn('JSONBin push error:', e.message);
+    return false;
+  } finally {
+    _pushing = false;
+  }
+}
+
+async function pullBin() {
+  if (!_jbKey || !_jbBinId) return false;
+  setSyncState('syncing', 'Sync...');
+  try {
+    const res = await fetch(`${JSONBIN_API}/b/${_jbBinId}/latest`, {
+      headers: { 'X-Master-Key': _jbKey },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const remote = data.record;
+
+    // Merge: remote gana (pull es para obtener cambios de otros dispositivos)
+    if (remote.products && remote.products.length > 0) {
+      state.products   = remote.products;
+      state.compraList = remote.compraList  || state.compraList;
+      state.categories = remote.categories  || state.categories;
+      state.quickIds   = remote.quickIds    || state.quickIds;
+      if (remote.history && remote.history.length > 0) state.history = remote.history;
+
+      state.products.forEach(p => {
+        if (!state.categories.includes(p.categoria)) state.categories.push(p.categoria);
+      });
+      saveState();
+      renderAll();
+    }
+    _lastSyncTs = Date.now();
+    setSyncState('ok', 'JSONBin');
+    return true;
+  } catch(e) {
+    setSyncState('error', 'Error');
+    console.warn('JSONBin pull error:', e.message);
+    return false;
+  }
+}
+
+function buildPayload() {
+  return {
+    products:    state.products,
+    compraList:  state.compraList,
+    categories:  state.categories,
+    quickIds:    state.quickIds,
+    history:     state.history.slice(0, 100),
+    syncTs:      Date.now(),
+    version:     '2.0',
+  };
+}
+
+// ── Debounced push: agrupa cambios rápidos en 1 sola petición ─
+
+let _pushTimer = null;
+function schedulePush(delayMs = 1200) {
+  if (!_jbKey || !_jbBinId) return;
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => pushBin(), delayMs);
+}
+
+// ── Auto-pull ────────────────────────────────────────────────
+
+function startAutoSync() {
+  if (_syncTimer) clearInterval(_syncTimer);
+  if (!_jbKey || !_jbBinId) return;
+
+  _syncTimer = setInterval(() => {
+    if (!document.hidden) pullBin();
+  }, SYNC_INTERVAL_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && _jbKey && _jbBinId && Date.now() - _lastSyncTs > 15000) {
+      pullBin();
+    }
+  });
+}
+
+// ── Acciones manuales desde Ajustes ─────────────────────────
+
+async function forcePullFromSheets() {
+  if (!_jbKey) { openSyncSetup(); return; }
+  if (!confirm('¿Obtener datos de JSONBin? Los datos locales se sobreescribirán.')) return;
+  const ok = await pullBin();
+  toast(ok ? '⬇️ Datos obtenidos de JSONBin' : '❌ Error al obtener datos');
+}
+
+async function forcePushToSheets() {
+  if (!_jbKey) { openSyncSetup(); return; }
+  if (!confirm('¿Enviar datos locales a JSONBin? Los datos en la nube se sobreescribirán.')) return;
+  const ok = await pushBin();
+  toast(ok ? '⬆️ Datos enviados a JSONBin' : '❌ Error al enviar datos');
+}
+
+function openSyncSetup() {
+  const inp = document.getElementById('jsonbinKeyInput');
+  if (inp && _jbKey) inp.value = _jbKey;
+  const res = document.getElementById('syncTestResult');
+  if (res) res.style.display = 'none';
+  openModal('modalSync');
+}
+
+// ── Parchear operaciones para push atómico ───────────────────
+
+function initSync() {
+  loadJsonbinCredentials();
+  if (_jbKey && _jbBinId) {
+    pullBin().then(() => startAutoSync());
+  }
+
+  // confirmUse → push tras descontar
+  const origUse = window.confirmUse;
+  window.confirmUse = function() {
+    origUse.call(this);
+    schedulePush();
+  };
+
+  // confirmAdd → push tras añadir stock
+  const origAdd = window.confirmAdd;
+  window.confirmAdd = function() {
+    origAdd.call(this);
+    schedulePush();
+  };
+
+  // confirmEdit → push tras editar producto
+  const origEdit = window.confirmEdit;
+  window.confirmEdit = function() {
+    origEdit.call(this);
+    schedulePush(800);
+  };
+
+  // confirmNewProduct → push tras crear producto
+  const origNew = window.confirmNewProduct;
+  window.confirmNewProduct = function() {
+    origNew.call(this);
+    schedulePush(800);
+  };
+
+  // deleteProduct → push tras borrar
+  const origDel = window.deleteProduct;
+  window.deleteProduct = function() {
+    origDel.call(this);
+    schedulePush(800);
+  };
+
+  // toggleCompraItem → push al marcar/desmarcar compra
+  const origToggle = window.toggleCompraItem;
+  window.toggleCompraItem = function(id) {
+    origToggle.call(this, id);
+    schedulePush(1500);
+  };
+
+  // clearCompra → push al limpiar lista
+  const origClear = window.clearCompra;
+  window.clearCompra = function() {
+    origClear.call(this);
+    schedulePush(800);
+  };
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  loadTheme();
+  renderAll();
+  renderPrediction();
+  setupDesktop();
+  initSync();
+});
+window.addEventListener('resize', setupDesktop);
+
+// ═══════════════════════════════════════
+//  PWA — Service Worker + Install Prompt
+// ═══════════════════════════════════════
+
+// Registrar Service Worker — solo en contexto real (https + sw.js disponible)
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !location.hostname.includes('claude')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        console.log('SW registrado:', reg.scope);
+        navigator.serviceWorker.addEventListener('message', e => {
+          if (e.data && e.data.type === 'SYNC_NOW' && _jbKey && _jbBinId) {
+            pushBin();
+          }
+        });
+      })
+      .catch(err => console.warn('SW error:', err));
+  });
+}
+
+// Banner de instalación PWA
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+
+  // Mostrar banner solo si aún no está instalada
+  if (!window.matchMedia('(display-mode: standalone)').matches) {
+    showInstallBanner();
+  }
+});
+
+function showInstallBanner() {
+  // No mostrar si ya hay un banner
+  if (document.getElementById('installBanner')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.style.cssText = `
+    position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 12px; right: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow-lg); z-index: 300;
+    animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+  `;
+  banner.innerHTML = `
+    <img src="icon-192.png" style="width:40px;height:40px;border-radius:10px;flex-shrink:0">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:600;color:var(--text)">Instalar como app</div>
+      <div style="font-size:12px;color:var(--text3)">Acceso directo desde tu pantalla de inicio</div>
+    </div>
+    <button onclick="installPWA()" style="
+      background:var(--accent);color:#fff;border:none;
+      border-radius:var(--radius-sm);padding:8px 14px;
+      font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;
+      flex-shrink:0;
+    ">Instalar</button>
+    <button onclick="this.parentElement.remove()" style="
+      background:none;border:none;color:var(--text3);
+      cursor:pointer;font-size:18px;padding:4px;flex-shrink:0;
+    ">✕</button>
+  `;
+  document.body.appendChild(banner);
+
+  // Auto-ocultar tras 8 segundos
+  setTimeout(() => banner.remove(), 8000);
+}
+
+async function installPWA() {
+  if (!_installPrompt) return;
+  _installPrompt.prompt();
+  const { outcome } = await _installPrompt.userChoice;
+  if (outcome === 'accepted') {
+    toast('✅ App instalada correctamente');
+    document.getElementById('installBanner')?.remove();
+  }
+  _installPrompt = null;
+}
+
+// En iOS Safari no hay beforeinstallprompt — mostrar instrucciones manuales
+function checkIOSInstall() {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const shownBefore = localStorage.getItem('avancedental_ios_hint');
+
+  if (isIOS && !isStandalone && !shownBefore) {
+    localStorage.setItem('avancedental_ios_hint', '1');
+    setTimeout(() => {
+      const banner = document.createElement('div');
+      banner.style.cssText = `
+        position: fixed; bottom: calc(var(--bottom-h) + 12px); left: 12px; right: 12px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 14px 16px;
+        box-shadow: var(--shadow-lg); z-index: 300;
+        animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+      `;
+      banner.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:14px;font-weight:600">📲 Instalar en iPhone / iPad</div>
+          <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px">✕</button>
+        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">
+          Pulsa <strong>Compartir</strong> <span style="font-size:16px">⬆️</span> en Safari → 
+          <strong>"Añadir a pantalla de inicio"</strong>
+        </div>
+      `;
+      document.body.appendChild(banner);
+      setTimeout(() => banner.remove(), 10000);
+    }, 2500);
+  }
+}
+
+window.addEventListener('load', checkIOSInstall);
+
+</script>
+</body>
+</html>
