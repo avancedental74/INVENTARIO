@@ -2004,8 +2004,8 @@ function loadJsonbinCredentials() {
 async function saveJsonbinKey() {
   const inp = document.getElementById('jsonbinKeyInput');
   const key = (inp ? inp.value : '').trim();
-  if (!key.startsWith('$2b$')) {
-    showSyncTestResult('error', '⚠️ La API Key debe empezar por $2b$... Cópiala exactamente desde jsonbin.io → API Keys');
+  if (!key.startsWith('$2')) {
+    showSyncTestResult('error', '⚠️ La API Key no es válida. Cópiala exactamente desde jsonbin.io → API Keys');
     return;
   }
   _jbKey = key;
