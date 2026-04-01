@@ -559,31 +559,31 @@
   }
 
   /* Barra lateral SOLO cuando body tiene clase .is-desktop (asignada por JS) */
-  body.is-desktop #app { flex-direction: row; }
-  body.is-desktop #topnav { display: none; }
-  body.is-desktop #bottombar {
+  html.is-desktop #app { flex-direction: row; }
+  html.is-desktop #topnav { display: none; }
+  html.is-desktop #bottombar {
     width: 220px; height: 100vh; flex-direction: column;
     border-top: none; border-right: 1px solid var(--border);
     padding: 20px 0; justify-content: flex-start; gap: 4px;
     align-items: stretch;
   }
-  body.is-desktop .tab-btn {
+  html.is-desktop .tab-btn {
     flex-direction: row; gap: 12px; padding: 12px 20px;
     justify-content: flex-start; border-radius: var(--radius-sm); margin: 0 8px;
     font-size: 14px; min-width: 0;
   }
-  body.is-desktop .tab-btn.active { background: var(--accent-light); color: var(--accent); }
-  body.is-desktop .tab-icon { font-size: 20px; }
-  body.is-desktop #main { order: 1; }
-  body.is-desktop .desktop-logo {
+  html.is-desktop .tab-btn.active { background: var(--accent-light); color: var(--accent); }
+  html.is-desktop .tab-icon { font-size: 20px; }
+  html.is-desktop #main { order: 1; }
+  html.is-desktop .desktop-logo {
     font-size: 18px; font-weight: 700; padding: 0 20px 16px;
     border-bottom: 1px solid var(--border); margin-bottom: 8px;
     color: var(--text); letter-spacing: -0.3px; display: block;
   }
-  body.is-desktop .desktop-logo span { color: var(--accent); }
+  html.is-desktop .desktop-logo span { color: var(--accent); }
 
   /* Móvil/tablet: logo siempre oculto */
-  body:not(.is-desktop) .desktop-logo { display: none; }
+  html:not(.is-desktop) .desktop-logo { display: none; }
 
   /* ── NO RESULTS ── */
   .no-results {
@@ -661,6 +661,15 @@
   }
   .url-input::placeholder { font-family: var(--font); font-size: 14px; color: var(--text3); }
 </style>
+<script>
+  // Ejecutar ANTES del primer pintado para evitar flash de layout incorrecto
+  (function() {
+    var ua = navigator.userAgent;
+    var isMobile = /android|iphone|ipad|ipod|mobile|tablet/i.test(ua);
+    var isWide = window.innerWidth >= 900;
+    if (!isMobile && isWide) document.documentElement.classList.add('is-desktop');
+  })();
+</script>
 </head>
 <body>
 <div id="app">
@@ -1965,9 +1974,9 @@ function isRealDesktop() {
 
 function setupDesktop() {
   if (isRealDesktop()) {
-    document.body.classList.add('is-desktop');
+    document.documentElement.classList.add('is-desktop');
   } else {
-    document.body.classList.remove('is-desktop');
+    document.documentElement.classList.remove('is-desktop');
   }
 }
 
