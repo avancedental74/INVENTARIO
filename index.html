@@ -18,12 +18,13 @@
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #F5F4F2;
     --surface: #FFFFFF;
-    --surface2: #F0EFEc;
+    --surface2: #F0EFEC;
     --border: #E5E3DE;
     --text: #1A1916;
     --text2: #6B6860;
@@ -47,7 +48,7 @@
     --nav-h: 64px;
     --bottom-h: 72px;
     --bottom-h: max(72px, calc(60px + env(safe-area-inset-bottom)));
-    --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+    --transition: background-color 0.18s cubic-bezier(0.4,0,0.2,1), color 0.18s cubic-bezier(0.4,0,0.2,1), border-color 0.18s cubic-bezier(0.4,0,0.2,1), transform 0.18s cubic-bezier(0.4,0,0.2,1), opacity 0.18s cubic-bezier(0.4,0,0.2,1), box-shadow 0.18s cubic-bezier(0.4,0,0.2,1);
   }
   [data-theme="dark"] {
     --bg: #111110;
@@ -1192,6 +1193,11 @@ let state = {
   predHistory: [],
 };
 
+// Contador monotónico para IDs únicos — nunca colisiona aunque se llame
+// varias veces en el mismo milisegundo
+let _idCounter = Date.now();
+function uniqueId() { return ++_idCounter; }
+
 function loadState() {
   try {
     const saved = localStorage.getItem('avancedental_v2');
@@ -1239,6 +1245,16 @@ function getStatus(p) {
 function getStatusLabel(s) { return s==='out'?'🔴':s==='low'?'🟡':'🟢'; }
 function nextId() { return Math.max(0, ...state.products.map(p=>p.id)) + 1; }
 
+// Escapa caracteres HTML peligrosos — usar siempre que datos de usuario vayan a innerHTML
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function addToHistory(type, product, qty) {
   state.history.unshift({
     type, productId: product.id, productName: product.nombre,
@@ -1255,7 +1271,7 @@ function addToCompra(product, qty) {
     existing.ts = Date.now();
   } else {
     state.compraList.unshift({
-      id: Date.now(),
+      id: uniqueId(),
       productId: product.id,
       productName: product.nombre,
       categoria: product.categoria,
@@ -1323,7 +1339,7 @@ function renderQuickAccess() {
     el.onclick = () => openUseModal(p.id);
     el.innerHTML = `
       <div class="quick-btn-icon">${icon}</div>
-      <div class="quick-btn-name">${p.nombre}</div>
+      <div class="quick-btn-name">${esc(p.nombre)}</div>
       <div class="quick-btn-stock ${s}">${p.stock} uds</div>`;
     grid.appendChild(el);
   });
@@ -1383,8 +1399,8 @@ function renderProductList() {
     card.onclick = () => openDetailModal(p.id);
     card.innerHTML = `
       <div class="product-info">
-        <div class="product-name">${highlightText(p.nombre, state.searchQuery)}</div>
-        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${p.categoria}</div>
+        <div class="product-name">${highlightText(esc(p.nombre), state.searchQuery)}</div>
+        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${esc(p.categoria)}</div>
       </div>
       <div class="product-stock-area">
         <div class="stock-badge ${s}">${p.stock}</div>
@@ -1411,8 +1427,8 @@ function renderAlerts() {
     card.onclick = () => openDetailModal(p.id);
     card.innerHTML = `
       <div class="product-info">
-        <div class="product-name">${p.nombre}</div>
-        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${p.categoria} · mín. ${p.minimo}</div>
+        <div class="product-name">${esc(p.nombre)}</div>
+        <div class="product-cat">${CAT_ICONS[p.categoria]||'📦'} ${esc(p.categoria)} · mín. ${p.minimo}</div>
       </div>
       <div class="product-stock-area">
         <div class="stock-badge ${s}">${p.stock}</div>
@@ -1431,7 +1447,7 @@ function renderCompra() {
     if (!state.compraList.find(c => c.productId === p.id && !c.done)) {
       const needed = Math.max(p.minimo * 2 - p.stock, p.minimo);
       state.compraList.push({
-        id: Date.now() + p.id,
+        id: uniqueId(),
         productId: p.id, productName: p.nombre,
         categoria: p.categoria, qty: needed,
         stockAtTime: p.stock, done: false, ts: Date.now()
@@ -1465,8 +1481,8 @@ function renderCompra() {
         ${item.done?'✓':''}
       </div>
       <div class="compra-info">
-        <div class="compra-name">${item.productName}</div>
-        <div class="compra-detail">${CAT_ICONS[item.categoria]||'📦'} ${item.categoria} · Stock al pedir: ${item.stockAtTime}</div>
+        <div class="compra-name">${esc(item.productName)}</div>
+        <div class="compra-detail">${CAT_ICONS[item.categoria]||'📦'} ${esc(item.categoria)} · Stock al pedir: ${item.stockAtTime}</div>
       </div>
       <div class="compra-qty">×${item.qty}</div>`;
     list.appendChild(el);
@@ -1494,8 +1510,6 @@ function showTab(tab) {
   document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
   state.currentTab = tab;
   document.getElementById('main').scrollTop = 0;
-  if (tab === 'compras') renderCompra();
-  if (tab === 'alertas') renderAlerts();
 }
 
 // ═══════════════════════════════════════
@@ -1543,7 +1557,6 @@ function openDetailModal(id) {
     <div class="detail-row"><span class="detail-row-label">Estado</span><span class="detail-row-val">${getStatusLabel(s)} ${s==='out'?'Agotado':s==='low'?'Bajo mínimo':'Correcto'}</span></div>
     <div class="detail-row"><span class="detail-row-label">Movimientos recientes</span><span class="detail-row-val">${hist.length}</span></div>
     ${hist.length>0?'<div style="margin-top:8px">'+hist.map(h=>`<div class="log-entry"><div class="log-dot ${h.type}"></div><div class="log-text">${h.type==='use'?'−':'+'} ${h.qty} uds</div><div class="log-time">${formatTime(h.ts)}</div></div>`).join('')+'</div>':''}`;
-
   const yaEnCompra = state.compraList.some(c => c.productId === id && !c.done);
   document.getElementById('detailActions').innerHTML = `
     <button class="btn-secondary" style="flex:1" onclick="closeModal('modalDetail');openAddStockModal(${id})">＋ Recibir pedido</button>
@@ -1699,8 +1712,8 @@ function renderCatList() {
   list.innerHTML = state.categories.map(c => {
     const count = state.products.filter(p => p.categoria === c).length;
     return `<div class="detail-row">
-      <span>${CAT_ICONS[c]||'📁'} ${c} <small style="color:var(--text3)">(${count})</small></span>
-      <button onclick="deleteCategory('${c}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
+      <span>${CAT_ICONS[c]||'📁'} ${esc(c)} <small style="color:var(--text3)">(${count})</small></span>
+      <button onclick="deleteCategory(${state.categories.indexOf(c)})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">✕</button>
     </div>`;
   }).join('');
 }
@@ -1717,7 +1730,9 @@ function addCategory() {
   document.getElementById('newCatInput').value = '';
   toast(`✅ Categoría añadida: ${val}`);
 }
-function deleteCategory(cat) {
+function deleteCategory(idx) {
+  const cat = state.categories[idx];
+  if (!cat) return;
   const count = state.products.filter(p => p.categoria === cat).length;
   if (count > 0) { toast(`⚠️ Hay ${count} productos en esta categoría`); return; }
   state.categories = state.categories.filter(c => c !== cat);
@@ -1735,7 +1750,7 @@ function addToCompraManual(id) {
   const yaExiste = state.compraList.some(c => c.productId === id && !c.done);
   if (yaExiste) { toast('⚠️ Ya está en la lista de compra'); return; }
   state.compraList.unshift({
-    id: Date.now(),
+    id: uniqueId(),
     productId: p.id,
     productName: p.nombre,
     categoria: p.categoria,
@@ -1833,7 +1848,7 @@ function generatePrediction(patients, filename) {
   }));
 
   const record = {
-    id: Date.now(),
+    id: uniqueId(),
     filename, patients,
     date: new Date().toLocaleDateString('es-ES'),
     results
@@ -1854,13 +1869,13 @@ function renderPrediction() {
       <div class="pred-result-header">
         <div>
           <div class="pred-result-title">Predicción mensual</div>
-          <div style="font-size:12px;color:var(--text3)">${latest.date} · ${latest.patients} pacientes · ${latest.filename}</div>
+          <div style="font-size:12px;color:var(--text3)">${esc(latest.date)} · ${latest.patients} pacientes · ${esc(latest.filename)}</div>
         </div>
         <div class="pred-result-badge">✓ Activa</div>
       </div>
       ${latest.results.map(r => `
         <div class="pred-row">
-          <span class="pred-row-name">${r.nombre}</span>
+          <span class="pred-row-name">${esc(r.nombre)}</span>
           <span class="pred-row-val">${r.monthly}/mes · ${r.weekly}/sem</span>
         </div>`).join('')}
     </div>
@@ -1870,8 +1885,8 @@ function renderPrediction() {
       ${state.predHistory.slice(1).map(h => `
         <div class="log-entry">
           <div class="log-dot add"></div>
-          <div class="log-text">${h.date} · ${h.patients} pacientes</div>
-          <div class="log-time">${h.filename}</div>
+          <div class="log-text">${esc(h.date)} · ${h.patients} pacientes</div>
+          <div class="log-time">${esc(h.filename)}</div>
         </div>`).join('')}
     </div>` : ''}`;
 }
@@ -1887,7 +1902,7 @@ function openHistory() {
     list.innerHTML = state.history.slice(0,50).map(h => `
       <div class="log-entry">
         <div class="log-dot ${h.type}"></div>
-        <div class="log-text"><strong>${h.type==='use'?'−':'+'} ${h.qty}</strong> ${h.productName}</div>
+        <div class="log-text"><strong>${h.type==='use'?'−':'+'} ${h.qty}</strong> ${esc(h.productName)}</div>
         <div class="log-time">${formatTime(h.ts)}</div>
       </div>`).join('');
   }
@@ -1955,14 +1970,12 @@ function loadTheme() {
 // ═══════════════════════════════════════
 function openModal(id) {
   document.getElementById(id).classList.add('open');
-  document.body.style.overflow = 'hidden';
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
-  document.body.style.overflow = '';
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => { m.classList.remove('open'); document.body.style.overflow = ''; });
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
 });
 
 // ═══════════════════════════════════════
@@ -2192,6 +2205,14 @@ function schedulePush(delayMs = 1200) {
 
 // ── Auto-pull ────────────────────────────────────────────────
 
+let _visibilityListenerAdded = false;
+
+function _onVisibilityChange() {
+  if (!document.hidden && _jbKey && _jbBinId && Date.now() - _lastSyncTs > 15000) {
+    pullBin();
+  }
+}
+
 function startAutoSync() {
   if (_syncTimer) clearInterval(_syncTimer);
   if (!_jbKey || !_jbBinId) return;
@@ -2200,11 +2221,11 @@ function startAutoSync() {
     if (!document.hidden) pullBin();
   }, SYNC_INTERVAL_MS);
 
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && _jbKey && _jbBinId && Date.now() - _lastSyncTs > 15000) {
-      pullBin();
-    }
-  });
+  // Añadir el listener solo una vez, sin importar cuántas veces se llame startAutoSync
+  if (!_visibilityListenerAdded) {
+    document.addEventListener('visibilitychange', _onVisibilityChange);
+    _visibilityListenerAdded = true;
+  }
 }
 
 // ── Acciones manuales desde Ajustes ─────────────────────────
