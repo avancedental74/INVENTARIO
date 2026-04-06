@@ -849,17 +849,14 @@
             </div>
             <span class="settings-arrow">›</span>
           </div>
-        </div>
-      </div>
-
       <div class="settings-section">
         <div class="settings-title">Sincronización</div>
         <div class="settings-card">
           <div class="settings-row" onclick="openSyncSetup()">
             <div class="settings-row-left">
-              <div class="settings-row-icon" style="background:#EFF6FF">☁️</div>
+              <div class="settings-row-icon" style="background:#E8F5E9">📊</div>
               <div>
-                <div class="settings-row-text">JSONBin</div>
+                <div class="settings-row-text">Google Sheets</div>
                 <div class="settings-row-sub" id="syncSettingsSub">Sin configurar</div>
               </div>
             </div>
@@ -875,12 +872,12 @@
             </div>
             <span class="settings-arrow">›</span>
           </div>
-          <div class="settings-row" onclick="forcePushToSheets()">
+          <div class="settings-row" onclick="migrateToSheets()">
             <div class="settings-row-left">
-              <div class="settings-row-icon" style="background:#FEF2F2">⬆️</div>
+              <div class="settings-row-icon" style="background:#EFF6FF">⬆️</div>
               <div>
-                <div class="settings-row-text">Enviar datos a Sheets</div>
-                <div class="settings-row-sub">Sobreescribe datos en la nube</div>
+                <div class="settings-row-text">Subir inventario local</div>
+                <div class="settings-row-sub">Primera vez: carga productos a Sheets</div>
               </div>
             </div>
             <span class="settings-arrow">›</span>
@@ -911,7 +908,7 @@
       </div>
 
       <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:12px">
-        Avance Dental Inventario v2.0 · JSONBin Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
+        Avance Dental Inventario v3.0 · Google Sheets Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
       </div>
     </div>
 
@@ -939,59 +936,59 @@
     </button>
   </nav>
 
-<!-- MODAL: SYNC SETUP -->
+<!-- MODAL: GOOGLE SHEETS SYNC SETUP -->
 <div class="modal-overlay" id="modalSync" onclick="closeModal('modalSync')">
   <div class="modal" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
     <div class="modal-handle"></div>
-    <div class="modal-title">☁️ Sincronización con JSONBin</div>
-    <div class="modal-sub">Gratis · Sin apps de Google · Funciona en cualquier dispositivo</div>
+    <div class="modal-title">📊 Sincronización con Google Sheets</div>
+    <div class="modal-sub">Tiempo real · Sin conflictos · Gratis · Sin límites</div>
 
     <div class="setup-card">
       <div class="setup-step">
         <div class="setup-num done">1</div>
         <div>
-          <strong>Crea una cuenta gratuita</strong><br>
-          <span style="color:var(--text3);font-size:13px">Ve a <a href="https://jsonbin.io" target="_blank" style="color:var(--accent)">jsonbin.io</a> → Sign Up (gratis). Confirma el email.</span>
+          <strong>Abre Google Sheets</strong><br>
+          <span style="color:var(--text3);font-size:13px">Crea una hoja nueva en <a href="https://sheets.google.com" target="_blank" style="color:var(--accent)">sheets.google.com</a>. Ponle el nombre que quieras.</span>
         </div>
       </div>
       <div class="setup-step">
         <div class="setup-num done">2</div>
         <div>
-          <strong>Copia tu API Key</strong><br>
-          <span style="color:var(--text3);font-size:13px">Una vez dentro → menú superior → <b>API Keys</b> → copia la clave que aparece (empieza por <code>$2b$...</code>).</span>
+          <strong>Abre el editor de Apps Script</strong><br>
+          <span style="color:var(--text3);font-size:13px">Dentro de Sheets → menú <b>Extensiones</b> → <b>Apps Script</b>. Borra el código que hay y pega el script que te hemos dado.</span>
         </div>
       </div>
       <div class="setup-step">
         <div class="setup-num done">3</div>
         <div>
-          <strong>Pega la API Key aquí</strong><br>
-          <div class="url-input-wrap" style="margin-top:8px">
-            <input class="url-input" id="jsonbinKeyInput"
-              placeholder="$2b$10$xxxxxxxxxxxxxxxxxxxxxxxx..."
-              autocomplete="off" spellcheck="false" style="font-size:13px">
-          </div>
+          <strong>Implementa como Web App</strong><br>
+          <span style="color:var(--text3);font-size:13px">Clic en <b>Implementar</b> → <b>Nueva implementación</b> → Tipo: <b>Aplicación web</b> → Acceso: <b>Cualquier usuario</b> → Implementar. Copia la URL.</span>
         </div>
       </div>
       <div class="setup-step" style="flex-direction:column;gap:8px;border-bottom:none">
         <div style="display:flex;gap:12px;align-items:center">
           <div class="setup-num" id="step4num">4</div>
-          <strong>Conectar y subir inventario</strong>
+          <strong>Pega la URL del Web App aquí</strong>
         </div>
-        <button class="btn-primary" style="margin-top:4px" onclick="saveJsonbinKey()">✅ Conectar</button>
+        <div class="url-input-wrap" style="margin-top:4px">
+          <input class="url-input" id="sheetsUrlInput"
+            placeholder="https://script.google.com/macros/s/..."
+            autocomplete="off" spellcheck="false" style="font-size:12px">
+        </div>
+        <button class="btn-primary" style="margin-top:8px" onclick="saveSheetsUrl()">✅ Conectar</button>
       </div>
     </div>
 
     <div id="syncTestResult" style="display:none;padding:12px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px"></div>
 
     <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:14px">
-      🔒 Tu API key se guarda solo en este dispositivo (localStorage).<br>Límite gratuito: 10.000 peticiones/mes.
+      🔒 La URL se guarda solo en este dispositivo.<br>
+      Comparte el mismo Google Sheet con todos los dispositivos.
     </div>
 
     <button class="btn-secondary" style="width:100%" onclick="closeModal('modalSync')">Cerrar</button>
   </div>
 </div>
-
-
 <div id="toast"></div>
 
 <!-- MODAL: PRODUCT DETAIL / USE -->
@@ -2001,70 +1998,123 @@ function setupDesktop() {
 
 
 // ═══════════════════════════════════════
-//  JSONBIN.IO SYNC LAYER
-//  API: https://api.jsonbin.io/v3
-//  Modelo: 1 bin = todo el estado (products, compraList, categories, quickIds, history)
-//  BroadcastChannel → instantáneo en misma red WiFi
-//  Pull cada 5s como backup · Push atómico en cada operación · Offline-first
-// ═══════════════════════════════════════
 
-const JSONBIN_KEY_STORAGE  = 'avancedental_jsonbin_key';
-const JSONBIN_BIN_STORAGE  = 'avancedental_jsonbin_bin';
-const JSONBIN_API          = 'https://api.jsonbin.io/v3';
-const SYNC_INTERVAL_MS     = 5000;   // backup poll — BroadcastChannel es el canal primario
-const BC_CHANNEL_NAME      = 'avancedental_sync_v2';
+// ═══════════════════════════════════════════════════════════════
+//  GOOGLE SHEETS SYNC LAYER v3.0
+//  Backend: Google Apps Script Web App
+//  Modelo: Operaciones atómicas por celda — sin race conditions
+//  Polling cada 4s + BroadcastChannel instantáneo entre tabs
+// ═══════════════════════════════════════════════════════════════
 
-let _jbKey     = '';  // API Key del usuario
-let _jbBinId   = '';  // ID del bin creado
-let _syncTimer = null;
-let _lastSyncTs = 0;
-let _pushing   = false;
-let _pullScheduled = false;
-let _bc        = null;  // BroadcastChannel instance
+const SHEETS_URL_KEY   = 'avancedental_sheets_url';
+const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
+const SYNC_INTERVAL_MS = 4000;
+const DEVICE_ID        = (() => {
+  let id = localStorage.getItem('avancedental_device_id');
+  if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,8); localStorage.setItem('avancedental_device_id', id); }
+  return id;
+})();
+
+let _sheetsUrl   = '';
+let _syncTimer   = null;
+let _bc          = null;
+let _lastSyncTs  = 0;
+let _syncing     = false;
+
+// ── Guard: bloquea escrituras hasta el primer pull completado ─
+// Evita que un dispositivo nuevo (con stock 0) sobreescriba Sheets
+let _syncReady   = false;   // true = ya recibimos datos de Sheets al menos 1 vez
+let _isNewDevice = false;   // true = localStorage vacío al arrancar (dispositivo nuevo)
+
+function _isSyncReady() {
+  if (!_sheetsUrl) return true;   // sin Sheets configurado → modo local, ok
+  return _syncReady;
+}
+
+function _showSyncOverlay(msg) {
+  if (document.getElementById('syncOverlay')) return;
+  const el = document.createElement('div');
+  el.id = 'syncOverlay';
+  el.style.cssText = [
+    'position:fixed','inset:0','z-index:9000',
+    'background:var(--bg)',
+    'display:flex','flex-direction:column','align-items:center','justify-content:center','gap:16px'
+  ].join(';');
+  el.innerHTML =
+    '<div style="font-size:48px;animation:syncPulse 1s ease-in-out infinite">\u2601\ufe0f</div>' +
+    '<div style="font-size:16px;font-weight:600;color:var(--text)">' + msg + '</div>' +
+    '<div style="font-size:13px;color:var(--text3)">Obteniendo inventario actualizado...</div>';
+  document.body.appendChild(el);
+}
+
+function _hideSyncOverlay() {
+  var el = document.getElementById('syncOverlay');
+  if (el) el.remove();
+}
 
 // ── UI helpers ──────────────────────────────────────────────
-
-function setSyncState(state, label) {
+function setSyncState(st, label) {
   const el  = document.getElementById('syncStatus');
   const lbl = document.getElementById('syncLabel');
   const bar = document.getElementById('syncBar');
   if (!el) return;
-  el.className = state;
+  el.className = st;
   lbl.textContent = label;
-  bar.classList.toggle('syncing', state === 'syncing');
-
+  bar.classList.toggle('syncing', st === 'syncing');
   const sub    = document.getElementById('syncSettingsSub');
   const footer = document.getElementById('syncFooter');
   const ts     = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-
   if (sub) {
     const msgs = { local:'Sin configurar', ok:`Conectado · ${ts}`, error:'Error de conexión', syncing:'Sincronizando...' };
-    sub.textContent = msgs[state] || '';
+    sub.textContent = msgs[st] || '';
   }
   if (footer) {
-    const fm = { local:'Datos locales', ok:'☁️ Sincronizado', error:'⚠️ Error sync', syncing:'🔄 Sync...' };
-    footer.textContent = fm[state] || '';
+    const fm = { local:'Datos locales', ok:'☁️ Sheets · ' + ts, error:'⚠️ Error sync', syncing:'🔄 Sync...' };
+    footer.textContent = fm[st] || '';
   }
 }
 
 function showSyncTestResult(type, msg) {
   const el = document.getElementById('syncTestResult');
+  if (!el) return;
   el.style.display = 'block';
-  const colors = { ok:'var(--green-light)/var(--green)', error:'var(--red-light)/var(--red)', info:'var(--accent-light)/var(--accent)' };
   el.style.background = type==='ok'?'var(--green-light)':type==='error'?'var(--red-light)':'var(--accent-light)';
   el.style.color      = type==='ok'?'var(--green)':type==='error'?'var(--red)':'var(--accent)';
   el.textContent = msg;
 }
 
-// ── Cargar credenciales guardadas ────────────────────────────
+// ── Llamada al backend ───────────────────────────────────────
+async function sheetsCall(params) {
+  if (!_sheetsUrl) throw new Error('URL no configurada');
+  const url = _sheetsUrl + '?' + new URLSearchParams(params).toString();
+  const res  = await fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error desconocido');
+  return data;
+}
 
-function loadJsonbinCredentials() {
-  _jbKey   = localStorage.getItem(JSONBIN_KEY_STORAGE) || '';
-  _jbBinId = localStorage.getItem(JSONBIN_BIN_STORAGE) || '';
-  if (_jbKey && _jbBinId) {
-    setSyncState('ok', 'JSONBin');
-    const inp = document.getElementById('jsonbinKeyInput');
-    if (inp) inp.value = _jbKey;
+async function sheetsPost(body) {
+  if (!_sheetsUrl) throw new Error('URL no configurada');
+  const res = await fetch(_sheetsUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error desconocido');
+  return data;
+}
+
+// ── Cargar URL guardada ──────────────────────────────────────
+function loadSheetsCredentials() {
+  _sheetsUrl = localStorage.getItem(SHEETS_URL_KEY) || '';
+  const inp = document.getElementById('sheetsUrlInput');
+  if (inp && _sheetsUrl) inp.value = _sheetsUrl;
+  if (_sheetsUrl) {
+    setSyncState('ok', 'Sheets');
     const s4 = document.getElementById('step4num');
     if (s4) s4.classList.add('done');
   } else {
@@ -2072,105 +2122,43 @@ function loadJsonbinCredentials() {
   }
 }
 
-// ── Guardar desde el modal ───────────────────────────────────
-
-async function saveJsonbinKey() {
-  const inp = document.getElementById('jsonbinKeyInput');
-  const key = (inp ? inp.value : '').trim();
-  if (!key.startsWith('$2')) {
-    showSyncTestResult('error', '⚠️ La API Key no es válida. Cópiala exactamente desde jsonbin.io → API Keys');
+// ── Guardar URL desde el modal ───────────────────────────────
+async function saveSheetsUrl() {
+  const inp = document.getElementById('sheetsUrlInput');
+  const url = (inp ? inp.value : '').trim();
+  if (!url.includes('script.google.com')) {
+    showSyncTestResult('error', '⚠️ La URL no es válida. Debe ser una URL de Google Apps Script.');
     return;
   }
-  _jbKey = key;
-  showSyncTestResult('info', '🔄 Creando almacenamiento en la nube...');
+  _sheetsUrl = url;
+  showSyncTestResult('info', '🔄 Conectando con Google Sheets...');
 
   try {
-    // Intentar crear un bin nuevo con el estado actual
-    const binId = await createBin();
-    _jbBinId = binId;
-    localStorage.setItem(JSONBIN_KEY_STORAGE, _jbKey);
-    localStorage.setItem(JSONBIN_BIN_STORAGE, _jbBinId);
-    showSyncTestResult('ok', `✅ Conectado. Bin ID: ${_jbBinId.slice(0,12)}...`);
-    setSyncState('ok', 'JSONBin');
+    await sheetsCall({ action: 'ping' });
+    localStorage.setItem(SHEETS_URL_KEY, _sheetsUrl);
+    showSyncTestResult('ok', '✅ Conectado. Ahora pulsa "Subir inventario local" en Ajustes para cargar tus datos.');
+    setSyncState('ok', 'Sheets');
     const s4 = document.getElementById('step4num');
     if (s4) s4.classList.add('done');
     startAutoSync();
-    setTimeout(() => closeModal('modalSync'), 1800);
+    setTimeout(() => closeModal('modalSync'), 2500);
   } catch(e) {
-    showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la API Key sea correcta.');
+    showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la URL sea correcta y que la web app esté publicada.');
   }
 }
 
-// ── API calls ────────────────────────────────────────────────
-
-async function createBin() {
-  const payload = buildPayload();
-  const res = await fetch(`${JSONBIN_API}/b`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Master-Key': _jbKey,
-      'X-Bin-Name': 'AvanceDental-Inventario',
-      'X-Bin-Private': 'false',
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `HTTP ${res.status}`);
-  }
-  const data = await res.json();
-  return data.metadata.id;
-}
-
-async function pushBin() {
-  if (!_jbKey || !_jbBinId) return false;
-  if (_pushing) return false;
-  _pushing = true;
+// ── getAll: obtiene el estado completo desde Sheets ─────────
+async function pullFromSheets() {
+  if (!_sheetsUrl) return false;
   setSyncState('syncing', 'Sync...');
   try {
-    const res = await fetch(`${JSONBIN_API}/b/${_jbBinId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': _jbKey,
-      },
-      body: JSON.stringify(buildPayload()),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    _lastSyncTs = Date.now();
-    setSyncState('ok', 'JSONBin');
-    // ── Notificar a todos los dispositivos en la misma red ────
-    _bcBroadcast({ type: 'INVALIDATE', ts: _lastSyncTs });
-    return true;
-  } catch(e) {
-    setSyncState('error', 'Error');
-    console.warn('JSONBin push error:', e.message);
-    return false;
-  } finally {
-    _pushing = false;
-  }
-}
-
-async function pullBin() {
-  if (!_jbKey || !_jbBinId) return false;
-  setSyncState('syncing', 'Sync...');
-  try {
-    const res = await fetch(`${JSONBIN_API}/b/${_jbBinId}/latest`, {
-      headers: { 'X-Master-Key': _jbKey },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const remote = data.record;
-
-    // Merge: remote gana (pull es para obtener cambios de otros dispositivos)
-    if (remote.products && remote.products.length > 0) {
-      state.products   = remote.products;
-      state.compraList = remote.compraList  || state.compraList;
-      state.categories = remote.categories  || state.categories;
-      state.quickIds   = remote.quickIds    || state.quickIds;
-      if (remote.history && remote.history.length > 0) state.history = remote.history;
-
+    const data = await sheetsCall({ action: 'getAll' });
+    if (data.products && data.products.length > 0) {
+      state.products   = data.products;
+      state.compraList = data.compraList  || state.compraList;
+      state.categories = data.categories  || state.categories;
+      state.quickIds   = data.quickIds    || state.quickIds;
+      if (data.history && data.history.length > 0) state.history = data.history;
       state.products.forEach(p => {
         if (!state.categories.includes(p.categoria)) state.categories.push(p.categoria);
       });
@@ -2178,174 +2166,285 @@ async function pullBin() {
       renderAll();
     }
     _lastSyncTs = Date.now();
-    setSyncState('ok', 'JSONBin');
+    _syncReady  = true;
+    _hideSyncOverlay();
+    setSyncState('ok', 'Sheets');
     return true;
   } catch(e) {
     setSyncState('error', 'Error');
-    console.warn('JSONBin pull error:', e.message);
+    _hideSyncOverlay();
+    console.warn('Sheets pull error:', e.message);
     return false;
   }
 }
 
-function buildPayload() {
-  return {
-    products:    state.products,
-    compraList:  state.compraList,
-    categories:  state.categories,
-    quickIds:    state.quickIds,
-    history:     state.history.slice(0, 100),
-    syncTs:      Date.now(),
-    version:     '2.0',
-  };
+// ── useStock atómico: solo modifica esa celda en Sheets ──────
+async function pushUseStock(productId, qty) {
+  if (!_sheetsUrl) return;
+  try {
+    const data = await sheetsPost({ action: 'useStock', id: productId, qty, device: DEVICE_ID });
+    // Actualizar el stock local con el valor real del servidor (evita desfase)
+    const p = state.products.find(x => x.id === productId);
+    if (p && data.stock !== undefined) {
+      p.stock = data.stock;
+      saveState();
+      renderAll();
+    }
+    _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('⚠️ Error de sync: ' + e.message);
+    console.warn('Sheets useStock error:', e.message);
+  }
 }
 
-// ── Debounced push: agrupa cambios rápidos en 1 sola petición ─
-
-let _pushTimer = null;
-function schedulePush(delayMs = 300) {
-  if (!_jbKey || !_jbBinId) return;
-  clearTimeout(_pushTimer);
-  _pushTimer = setTimeout(() => pushBin(), delayMs);
+// ── addStock atómico ─────────────────────────────────────────
+async function pushAddStock(productId, qty) {
+  if (!_sheetsUrl) return;
+  try {
+    const data = await sheetsPost({ action: 'addStock', id: productId, qty, device: DEVICE_ID });
+    const p = state.products.find(x => x.id === productId);
+    if (p && data.stock !== undefined) {
+      p.stock = data.stock;
+      saveState();
+      renderAll();
+    }
+    _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('⚠️ Error de sync: ' + e.message);
+    console.warn('Sheets addStock error:', e.message);
+  }
 }
 
-// ── BroadcastChannel — canal primario entre dispositivos ─────
+// ── Operaciones de meta (compra, categorías, quickIds) ───────
+async function pushMeta(key, value) {
+  if (!_sheetsUrl) return;
+  try {
+    await sheetsPost({ action: 'setMeta', key, value, device: DEVICE_ID });
+  } catch(e) {
+    console.warn('Sheets setMeta error:', e.message);
+  }
+}
 
+// ── Añadir producto nuevo ────────────────────────────────────
+async function pushNewProduct(product) {
+  if (!_sheetsUrl) return;
+  try {
+    await sheetsPost({ action: 'addProduct', product, device: DEVICE_ID });
+    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('⚠️ Error al crear producto en Sheets: ' + e.message);
+  }
+}
+
+// ── Editar producto ──────────────────────────────────────────
+async function pushEditProduct(id, changes) {
+  if (!_sheetsUrl) return;
+  try {
+    await sheetsPost({ action: 'editProduct', id, changes, device: DEVICE_ID });
+    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('⚠️ Error al editar en Sheets: ' + e.message);
+  }
+}
+
+// ── Eliminar producto ────────────────────────────────────────
+async function pushDeleteProduct(id) {
+  if (!_sheetsUrl) return;
+  try {
+    await sheetsPost({ action: 'deleteProduct', id, device: DEVICE_ID });
+    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('⚠️ Error al eliminar en Sheets: ' + e.message);
+  }
+}
+
+// ── Migración inicial: sube inventario local a Sheets ────────
+async function migrateToSheets() {
+  if (!_sheetsUrl) { openSyncSetup(); return; }
+  if (!confirm('¿Subir el inventario local a Google Sheets? Esto creará todas las filas en la hoja.')) return;
+  setSyncState('syncing', 'Migrando...');
+  toast('🔄 Subiendo inventario a Sheets...');
+  let ok = 0, err = 0;
+  for (const p of state.products) {
+    try {
+      await sheetsPost({ action: 'addProduct', product: p, device: DEVICE_ID });
+      ok++;
+    } catch(e) { err++; }
+  }
+  // Subir meta
+  try {
+    await sheetsPost({ action: 'setMeta', key: 'categories', value: state.categories });
+    await sheetsPost({ action: 'setMeta', key: 'quickIds',   value: state.quickIds });
+    await sheetsPost({ action: 'setMeta', key: 'compraList', value: state.compraList });
+  } catch(e) {}
+  setSyncState('ok', 'Sheets');
+  toast(`✅ Migración completa: ${ok} productos · ${err} errores`);
+}
+
+// ── BroadcastChannel ─────────────────────────────────────────
 function _bcBroadcast(msg) {
-  try { if (_bc) _bc.postMessage(msg); } catch(e) { /* canal cerrado */ }
+  try { if (_bc) _bc.postMessage(msg); } catch(e) {}
 }
 
 function _initBroadcastChannel() {
-  if (!('BroadcastChannel' in window)) return;  // Safari < 15.4 fallback al poll
+  if (!('BroadcastChannel' in window)) return;
   try {
     if (_bc) _bc.close();
     _bc = new BroadcastChannel(BC_CHANNEL_NAME);
     _bc.onmessage = (e) => {
       const msg = e.data;
-      if (!msg || msg.type !== 'INVALIDATE') return;
-      if (!_jbKey || !_jbBinId) return;
-      // Evitar doble-pull si el mensaje es propio (mismo timestamp)
-      if (msg.ts && msg.ts === _lastSyncTs) return;
-      // Pull inmediato al recibir notificación de cambio
-      pullBin();
+      if (!msg) return;
+      if (!_sheetsUrl) return;
+      if (msg.type === 'STOCK_CHANGED' && msg.productId) {
+        // Actualización rápida: solo ese producto
+        const p = state.products.find(x => x.id === msg.productId);
+        if (p && msg.stock !== undefined) {
+          p.stock = msg.stock;
+          saveState();
+          renderAll();
+        }
+      } else if (msg.type === 'PRODUCTS_CHANGED') {
+        pullFromSheets();
+      }
     };
   } catch(e) {
-    console.warn('BroadcastChannel no disponible:', e.message);
     _bc = null;
   }
 }
 
-// ── Auto-pull (backup poll cada 5s + visibilityChange inmediato) ─
-
+// ── Auto-pull + visibilityChange ─────────────────────────────
 let _visibilityListenerAdded = false;
-
-function _onVisibilityChange() {
-  // Sin guard de tiempo — pull inmediato al volver a la app
-  if (!document.hidden && _jbKey && _jbBinId) {
-    pullBin();
-  }
-}
 
 function startAutoSync() {
   if (_syncTimer) clearInterval(_syncTimer);
-  if (!_jbKey || !_jbBinId) return;
-
-  // BroadcastChannel: canal primario instantáneo
+  if (!_sheetsUrl) return;
   _initBroadcastChannel();
-
-  // Poll de backup cada 5s (cubre Safari antiguo y tabs sin BroadcastChannel)
   _syncTimer = setInterval(() => {
-    if (!document.hidden) pullBin();
+    if (!document.hidden && !_syncing) pullFromSheets();
   }, SYNC_INTERVAL_MS);
-
-  // visibilityChange: pull inmediato al desbloquear pantalla o volver a la app
   if (!_visibilityListenerAdded) {
-    document.addEventListener('visibilitychange', _onVisibilityChange);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && _sheetsUrl) pullFromSheets();
+    });
     _visibilityListenerAdded = true;
   }
 }
 
 // ── Acciones manuales desde Ajustes ─────────────────────────
-
 async function forcePullFromSheets() {
-  if (!_jbKey) { openSyncSetup(); return; }
-  if (!confirm('¿Obtener datos de JSONBin? Los datos locales se sobreescribirán.')) return;
-  const ok = await pullBin();
-  toast(ok ? '⬇️ Datos obtenidos de JSONBin' : '❌ Error al obtener datos');
-}
-
-async function forcePushToSheets() {
-  if (!_jbKey) { openSyncSetup(); return; }
-  if (!confirm('¿Enviar datos locales a JSONBin? Los datos en la nube se sobreescribirán.')) return;
-  const ok = await pushBin();
-  toast(ok ? '⬆️ Datos enviados a JSONBin' : '❌ Error al enviar datos');
+  if (!_sheetsUrl) { openSyncSetup(); return; }
+  if (!confirm('¿Obtener datos de Google Sheets? Los datos locales se actualizarán.')) return;
+  const ok = await pullFromSheets();
+  toast(ok ? '⬇️ Datos actualizados desde Sheets' : '❌ Error al obtener datos');
 }
 
 function openSyncSetup() {
-  const inp = document.getElementById('jsonbinKeyInput');
-  if (inp && _jbKey) inp.value = _jbKey;
+  const inp = document.getElementById('sheetsUrlInput');
+  if (inp && _sheetsUrl) inp.value = _sheetsUrl;
   const res = document.getElementById('syncTestResult');
   if (res) res.style.display = 'none';
   openModal('modalSync');
 }
 
-// ── Parchear operaciones para push atómico ───────────────────
-
+// ── initSync: parcha las operaciones de la app ───────────────
 function initSync() {
-  loadJsonbinCredentials();
-  if (_jbKey && _jbBinId) {
-    pullBin().then(() => startAutoSync());
+  loadSheetsCredentials();
+
+  if (_sheetsUrl) {
+    // Detectar si este dispositivo es nuevo (sin datos locales guardados)
+    _isNewDevice = !localStorage.getItem('avancedental_v2');
+
+    if (_isNewDevice) {
+      // Dispositivo nuevo: mostrar overlay y ESPERAR al pull antes de permitir cualquier acción
+      _showSyncOverlay('Conectando con el inventario...');
+      pullFromSheets().then(() => {
+        startAutoSync();
+        toast('✅ Inventario cargado desde Google Sheets');
+      });
+    } else {
+      // Dispositivo conocido: tiene datos locales válidos → pull en background sin bloquear
+      _syncReady = true;    // ya tiene datos locales, puede escribir mientras llega el pull
+      pullFromSheets().then(() => startAutoSync());
+    }
+  } else {
+    // Sin Sheets configurado → modo local, todo permitido
+    _syncReady = true;
   }
 
-  // confirmUse → push tras descontar (operación crítica — delay mínimo)
+  // ── confirmUse: descuenta atómicamente en Sheets ──────────
   const origUse = window.confirmUse;
   window.confirmUse = function() {
-    origUse.call(this);
-    schedulePush(300);
+    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
+    const id  = currentProductId;
+    const qty = useQty;
+    origUse.call(this);              // actualiza local inmediatamente
+    pushUseStock(id, qty);           // luego sincroniza en background
   };
 
-  // confirmAdd → push tras añadir stock
+  // ── confirmAdd: añade stock atómicamente ──────────────────
   const origAdd = window.confirmAdd;
   window.confirmAdd = function() {
+    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
+    const id  = currentProductId;
+    const qty = addQty;
     origAdd.call(this);
-    schedulePush(300);
+    pushAddStock(id, qty);
   };
 
-  // confirmEdit → push tras editar producto
+  // ── confirmEdit: edita producto ───────────────────────────
   const origEdit = window.confirmEdit;
   window.confirmEdit = function() {
+    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
+    const id      = parseInt(document.getElementById('editProdId').value);
+    const changes = {
+      nombre:    document.getElementById('editProdName').value.trim(),
+      stock:     parseInt(document.getElementById('editProdStock').value) || 0,
+      minimo:    parseInt(document.getElementById('editProdMin').value) || 2,
+      categoria: document.getElementById('editProdCat').value,
+    };
     origEdit.call(this);
-    schedulePush(500);
+    pushEditProduct(id, changes);
   };
 
-  // confirmNewProduct → push tras crear producto
+  // ── confirmNewProduct: añade producto ─────────────────────
   const origNew = window.confirmNewProduct;
   window.confirmNewProduct = function() {
+    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
+    const nombre = document.getElementById('newProdName').value.trim();
+    if (!nombre) return;
     origNew.call(this);
-    schedulePush(500);
+    // El producto ya está en state — buscarlo por nombre para obtener su ID
+    const p = state.products.find(x => x.nombre === nombre.toLowerCase());
+    if (p) pushNewProduct(p);
   };
 
-  // deleteProduct → push tras borrar
+  // ── deleteProduct: elimina producto ──────────────────────
   const origDel = window.deleteProduct;
   window.deleteProduct = function() {
+    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
+    const id = parseInt(document.getElementById('editProdId').value);
     origDel.call(this);
-    schedulePush(500);
+    pushDeleteProduct(id);
   };
 
-  // toggleCompraItem → push al marcar/desmarcar compra
+  // ── toggleCompraItem + clearCompra: meta sync ─────────────
   const origToggle = window.toggleCompraItem;
   window.toggleCompraItem = function(id) {
     origToggle.call(this, id);
-    schedulePush(500);
+    pushMeta('compraList', state.compraList);
   };
 
-  // clearCompra → push al limpiar lista
   const origClear = window.clearCompra;
   window.clearCompra = function() {
     origClear.call(this);
-    schedulePush(500);
+    pushMeta('compraList', state.compraList);
   };
 }
-
 // ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
@@ -2370,8 +2469,8 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !location.
       .then(reg => {
         console.log('SW registrado:', reg.scope);
         navigator.serviceWorker.addEventListener('message', e => {
-          if (e.data && e.data.type === 'SYNC_NOW' && _jbKey && _jbBinId) {
-            pushBin();
+          if (e.data && e.data.type === 'SYNC_NOW' && _sheetsUrl) {
+            pullFromSheets();
           }
         });
       })
@@ -2480,7 +2579,7 @@ window.addEventListener('load', checkIOSInstall);
 // ═══════════════════════════════════════
 
 // ── VERSIÓN DE LA APP — incrementa este número cada vez que subas cambios a GitHub ──
-const APP_VERSION = '2.2';
+const APP_VERSION = '3.0';
 
 async function checkForUpdate() {
   try {
