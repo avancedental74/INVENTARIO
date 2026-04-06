@@ -318,13 +318,15 @@
   /* ── MODAL ── */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px); z-index: 100;
+    backdrop-filter: blur(4px); z-index: 1100;
     display: none; align-items: flex-end; justify-content: center;
   }
   .modal-overlay.open { display: flex; }
+  body.modal-open #bottombar { z-index: 50; }  /* queda bajo el overlay cuando hay modal */
   .modal {
     background: var(--surface); border-radius: 24px 24px 0 0;
-    width: 100%; max-width: 520px; padding: 24px 20px 32px;
+    width: 100%; max-width: 520px;
+    padding: 24px 20px calc(32px + env(safe-area-inset-bottom, 0px));
     max-height: 90vh; overflow-y: auto;
     animation: slideUp 0.25s cubic-bezier(0.4,0,0.2,1);
   }
@@ -534,7 +536,7 @@
     position: fixed; bottom: calc(var(--bottom-h) + 16px); left: 50%; transform: translateX(-50%) translateY(20px);
     background: var(--text); color: var(--bg); padding: 12px 20px;
     border-radius: var(--radius); font-size: 14px; font-weight: 500;
-    z-index: 200; opacity: 0; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 9998; opacity: 0; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
     white-space: nowrap; box-shadow: var(--shadow-lg);
     pointer-events: none; max-width: calc(100vw - 32px);
   }
@@ -849,6 +851,9 @@
             </div>
             <span class="settings-arrow">›</span>
           </div>
+        </div>
+      </div>
+
       <div class="settings-section">
         <div class="settings-title">Sincronización</div>
         <div class="settings-card">
@@ -1240,7 +1245,7 @@ function getStatus(p) {
   return 'ok';
 }
 function getStatusLabel(s) { return s==='out'?'🔴':s==='low'?'🟡':'🟢'; }
-function nextId() { return Math.max(0, ...state.products.map(p=>p.id)) + 1; }
+function nextId() { return state.products.length === 0 ? 1 : Math.max(...state.products.map(p=>p.id)) + 1; }
 
 // Escapa caracteres HTML peligrosos — usar siempre que datos de usuario vayan a innerHTML
 function esc(str) {
@@ -1440,6 +1445,7 @@ function renderCompra() {
   const stats = document.getElementById('compraStats');
 
   // Auto-add products below minimum
+  let _compraChanged = false;
   state.products.filter(p => p.stock <= p.minimo).forEach(p => {
     if (!state.compraList.find(c => c.productId === p.id && !c.done)) {
       const needed = Math.max(p.minimo * 2 - p.stock, p.minimo);
@@ -1449,8 +1455,10 @@ function renderCompra() {
         categoria: p.categoria, qty: needed,
         stockAtTime: p.stock, done: false, ts: Date.now()
       });
+      _compraChanged = true;
     }
   });
+  if (_compraChanged) { saveState(); pushMeta('compraList', state.compraList); }
 
   const pending = state.compraList.filter(c => !c.done);
   const done = state.compraList.filter(c => c.done);
@@ -1581,6 +1589,7 @@ function openUseModal(id) {
 }
 function changeUseQty(delta) {
   const p = state.products.find(x => x.id === currentProductId);
+  if (!p) return;
   useQty = Math.max(1, Math.min(p.stock, useQty + delta));
   document.getElementById('useQtyVal').textContent = useQty;
 }
@@ -1723,6 +1732,7 @@ function addCategory() {
     renderCatList();
     renderCategoryFilter();
     document.getElementById('catCount').textContent = `${state.categories.length} categorías`;
+    pushMeta('categories', state.categories);
   }
   document.getElementById('newCatInput').value = '';
   toast(`✅ Categoría añadida: ${val}`);
@@ -1736,6 +1746,7 @@ function deleteCategory(idx) {
   saveState();
   renderCatList();
   renderCategoryFilter();
+  pushMeta('categories', state.categories);
 }
 
 // ═══════════════════════════════════════
@@ -1752,11 +1763,13 @@ function addToCompraManual(id) {
     productName: p.nombre,
     categoria: p.categoria,
     qty: 1,
+    stockAtTime: p.stock,
     done: false,
     manual: true
   });
   saveState();
   renderCompra();
+  pushMeta('compraList', state.compraList);
   toast('🛒 Añadido a la lista de compra');
 }
 
@@ -1916,6 +1929,13 @@ function openBulkMinimos() {
     state.products.forEach(p => p.minimo = n);
     saveState(); renderAll();
     toast(`✅ Mínimo global actualizado a ${n}`);
+    // Sincronizar cada producto en Sheets (solo cambia la columna minimo)
+    if (_sheetsUrl) {
+      state.products.forEach(p => {
+        sheetsPost({ action: 'editProduct', id: p.id, changes: { minimo: n }, device: DEVICE_ID })
+          .catch(e => console.warn('bulkMinimos sync error:', e.message));
+      });
+    }
   }
 }
 
@@ -1940,7 +1960,11 @@ function resetAll() {
   state.quickIds = [3,4,34,13,36,14,39,104];
   state.predHistory = [];
   saveState(); renderAll();
-  toast('🗑 Datos reseteados');
+  if (_sheetsUrl) {
+    toast('⚠️ Datos locales reseteados. Los datos de Google Sheets NO se han borrado — al próximo sync se restaurarán.');
+  } else {
+    toast('🗑 Datos reseteados');
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1967,12 +1991,20 @@ function loadTheme() {
 // ═══════════════════════════════════════
 function openModal(id) {
   document.getElementById(id).classList.add('open');
+  document.body.classList.add('modal-open');
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+  // Solo quitar modal-open si no quedan otros modales abiertos
+  if (!document.querySelector('.modal-overlay.open')) {
+    document.body.classList.remove('modal-open');
+  }
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    document.body.classList.remove('modal-open');
+  }
 });
 
 // ═══════════════════════════════════════
@@ -2141,7 +2173,6 @@ async function saveSheetsUrl() {
     const s4 = document.getElementById('step4num');
     if (s4) s4.classList.add('done');
     startAutoSync();
-    setTimeout(() => closeModal('modalSync'), 2500);
   } catch(e) {
     showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la URL sea correcta y que la web app esté publicada.');
   }
@@ -2150,6 +2181,8 @@ async function saveSheetsUrl() {
 // ── getAll: obtiene el estado completo desde Sheets ─────────
 async function pullFromSheets() {
   if (!_sheetsUrl) return false;
+  if (_syncing) return false;
+  _syncing = true;
   setSyncState('syncing', 'Sync...');
   try {
     const data = await sheetsCall({ action: 'getAll' });
@@ -2164,6 +2197,9 @@ async function pullFromSheets() {
       });
       saveState();
       renderAll();
+    } else if (data.products && data.products.length === 0 && _isNewDevice) {
+      // Sheets conectado pero vacío — avisar para que haga la migración
+      toast('⚠️ Google Sheets está vacío. Ve a Ajustes → Subir inventario local.');
     }
     _lastSyncTs = Date.now();
     _syncReady  = true;
@@ -2175,6 +2211,8 @@ async function pullFromSheets() {
     _hideSyncOverlay();
     console.warn('Sheets pull error:', e.message);
     return false;
+  } finally {
+    _syncing = false;
   }
 }
 
@@ -2190,6 +2228,8 @@ async function pushUseStock(productId, qty) {
       saveState();
       renderAll();
     }
+    // Sincronizar también compraList (puede haberse modificado por addToCompra)
+    pushMeta('compraList', state.compraList);
     _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
   } catch(e) {
     setSyncState('error', 'Error');
@@ -2209,6 +2249,8 @@ async function pushAddStock(productId, qty) {
       saveState();
       renderAll();
     }
+    // Sincronizar compraList (confirmAdd puede haber marcado ítems como done)
+    pushMeta('compraList', state.compraList);
     _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
   } catch(e) {
     setSyncState('error', 'Error');
@@ -2269,21 +2311,22 @@ async function migrateToSheets() {
   if (!confirm('¿Subir el inventario local a Google Sheets? Esto creará todas las filas en la hoja.')) return;
   setSyncState('syncing', 'Migrando...');
   toast('🔄 Subiendo inventario a Sheets...');
-  let ok = 0, err = 0;
-  for (const p of state.products) {
-    try {
-      await sheetsPost({ action: 'addProduct', product: p, device: DEVICE_ID });
-      ok++;
-    } catch(e) { err++; }
-  }
-  // Subir meta
   try {
-    await sheetsPost({ action: 'setMeta', key: 'categories', value: state.categories });
-    await sheetsPost({ action: 'setMeta', key: 'quickIds',   value: state.quickIds });
-    await sheetsPost({ action: 'setMeta', key: 'compraList', value: state.compraList });
-  } catch(e) {}
-  setSyncState('ok', 'Sheets');
-  toast(`✅ Migración completa: ${ok} productos · ${err} errores`);
+    // Una sola llamada batch — evita el rate limit de Google Apps Script
+    await sheetsPost({
+      action: 'addAllProducts',
+      products: state.products,
+      categories: state.categories,
+      quickIds: state.quickIds,
+      compraList: state.compraList,
+      device: DEVICE_ID,
+    });
+    setSyncState('ok', 'Sheets');
+    toast('✅ Migración completa — ' + state.products.length + ' productos subidos');
+  } catch(e) {
+    setSyncState('error', 'Error');
+    toast('❌ Error en migración: ' + e.message);
+  }
 }
 
 // ── BroadcastChannel ─────────────────────────────────────────
@@ -2304,7 +2347,7 @@ function _initBroadcastChannel() {
         // Actualización rápida: solo ese producto
         const p = state.products.find(x => x.id === msg.productId);
         if (p && msg.stock !== undefined) {
-          p.stock = msg.stock;
+          p.stock = Number(msg.stock);
           saveState();
           renderAll();
         }
@@ -2362,9 +2405,21 @@ function initSync() {
     if (_isNewDevice) {
       // Dispositivo nuevo: mostrar overlay y ESPERAR al pull antes de permitir cualquier acción
       _showSyncOverlay('Conectando con el inventario...');
+      // Timeout de 15s: si Sheets no responde, entra en modo local para no quedar bloqueado
+      const _overlayTimeout = setTimeout(() => {
+        _hideSyncOverlay();
+        _syncReady = true;
+        toast('⚠️ No se pudo conectar con Sheets. Usando datos locales.');
+      }, 15000);
       pullFromSheets().then(() => {
+        clearTimeout(_overlayTimeout);
         startAutoSync();
         toast('✅ Inventario cargado desde Google Sheets');
+      }).catch(() => {
+        clearTimeout(_overlayTimeout);
+        _hideSyncOverlay();
+        _syncReady = true;
+        toast('⚠️ Error al conectar con Sheets. Usando datos locales.');
       });
     } else {
       // Dispositivo conocido: tiene datos locales válidos → pull en background sin bloquear
@@ -2417,10 +2472,14 @@ function initSync() {
     if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
     const nombre = document.getElementById('newProdName').value.trim();
     if (!nombre) return;
+    // Capturar el tamaño ANTES para saber el índice del nuevo producto
+    const prevLen = state.products.length;
     origNew.call(this);
-    // El producto ya está en state — buscarlo por nombre para obtener su ID
-    const p = state.products.find(x => x.nombre === nombre.toLowerCase());
-    if (p) pushNewProduct(p);
+    // El producto nuevo siempre se hace push() al array → es el último
+    if (state.products.length > prevLen) {
+      const p = state.products[state.products.length - 1];
+      pushNewProduct(p);
+    }
   };
 
   // ── deleteProduct: elimina producto ──────────────────────

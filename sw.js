@@ -1,26 +1,32 @@
 // ═══════════════════════════════════════════════════════════════
-//  AVANCE DENTAL — Service Worker v2.0
-//  Estrategia: Cache-first para assets, Network-first para API
+//  AVANCE DENTAL — Service Worker v3.0
+//  Estrategia: Cache-first para assets, Network-only para APIs
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'avancedental-v2';
+const CACHE_NAME = 'avancedental-v3';
 const ASSETS_TO_CACHE = [
   './',
-  './index.html',
+  // index.html NO se cachea: el SW lo sirviría en lugar de la versión nueva
+  // cuando checkForUpdate intenta detectar actualizaciones. 
+  // La navegación offline usa el fallback de la hoja vacía del catch.
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap',
+  // manifest.json tampoco — raramente cambia pero si cambia debe actualizarse
 ];
 
-// ── Install: cachear todos los assets ───────────────────────
+// ── Install: cachear assets locales (fuentes NO — fallan por CORS en install) ──
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn('SW: algunos assets no se pudieron cachear:', err);
-      });
+      // addAll falla si UN asset no existe — usamos add individual con catch
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map(url =>
+          cache.add(url).catch(err =>
+            console.warn('SW: no se pudo cachear', url, err.message)
+          )
+        )
+      );
     })
   );
   self.skipWaiting();
@@ -42,46 +48,74 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // JSONBin API → Network only (datos en tiempo real, no cachear)
+  // ── 1. Google Apps Script (Sheets API) → Network only, NUNCA cachear ──
+  // Tampoco interceptar si falla — dejar pasar el error al cliente
+  if (url.hostname === 'script.google.com') {
+    // No llamar event.respondWith() → el navegador gestiona la petición solo
+    return;
+  }
+
+  // ── 2. JSONBin (legacy) → Network only ──────────────────────
   if (url.hostname === 'api.jsonbin.io') {
+    return; // igual, no interceptar
+  }
+
+  // ── 3. Google Fonts → Cache first con fallback silencioso ───
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Sin conexión' }), {
-          headers: { 'Content-Type': 'application/json' }
+      caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).then(res => {
+          // Solo cachear si la respuesta es válida
+          if (res && res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          }
+          return res;
+        }).catch(() => {
+          // Sin red y sin caché de fuentes → devolver respuesta vacía válida
+          // (la app funciona con fuentes del sistema como fallback)
+          return new Response('', { status: 200, headers: { 'Content-Type': 'text/css' } });
         });
       })
     );
     return;
   }
 
-  // Google Fonts → Cache first
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-        return res;
-      }).catch(() => cached))
-    );
-    return;
-  }
+  // ── 4. Solo interceptar peticiones GET de assets locales ────
+  // Peticiones POST, peticiones a otros dominios → dejar pasar sin interceptar
+  if (event.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
 
-  // App shell y assets locales → Cache first, network fallback
+  // ── 5. App shell y assets locales → Cache first, network fallback ──
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
+
       return fetch(event.request).then(res => {
-        // Cachear respuestas válidas
-        if (res && res.status === 200 && res.type === 'basic') {
+        // Solo cachear respuestas válidas del mismo origen
+        if (res && res.ok && res.type === 'basic') {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
         return res;
       }).catch(() => {
-        // Offline fallback: devolver el index.html cacheado
+        // Sin red y sin caché:
+        // — Si es navegación → devolver index.html cacheado (offline shell)
         if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+          return caches.match('./index.html').then(fallback => {
+            // NUNCA devolver null — si index.html no está en caché,
+            // devolver una página mínima de "sin conexión"
+            return fallback || new Response(
+              '<html><body style="font-family:sans-serif;text-align:center;padding:40px">' +
+              '<h2>Sin conexión</h2><p>Vuelve a abrir la app cuando tengas red.</p>' +
+              '</body></html>',
+              { status: 200, headers: { 'Content-Type': 'text/html' } }
+            );
+          });
         }
+        // Para otros assets (imágenes, etc.) → respuesta vacía válida, nunca null
+        return new Response('', { status: 408, statusText: 'Sin conexión' });
       });
     })
   );
