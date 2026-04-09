@@ -881,8 +881,8 @@
             <div class="settings-row-left">
               <div class="settings-row-icon" style="background:#EFF6FF">⬆️</div>
               <div>
-                <div class="settings-row-text">Subir inventario local</div>
-                <div class="settings-row-sub">Primera vez: carga productos a Sheets</div>
+                <div class="settings-row-text">Fusionar datos locales con el Sheet</div>
+                <div class="settings-row-sub">Combina los datos de este móvil con los de la nube sin borrar nada.</div>
               </div>
             </div>
             <span class="settings-arrow">›</span>
@@ -2290,6 +2290,35 @@ function showSyncTestResult(type, msg) {
   el.style.background = type==='ok'?'var(--green-light)':type==='error'?'var(--red-light)':'var(--accent-light)';
   el.style.color      = type==='ok'?'var(--green)':type==='error'?'var(--red)':'var(--accent)';
   el.textContent = msg;
+}
+
+async function migrateToSheets() {
+  if (!_sheetsUrl) { openSyncSetup(); return; }
+  if (!confirm('¿Fusionar tus datos locales con la nube? (Evita pérdida si varios dispositivos tienen datos diferentes)')) return;
+  
+  _showSyncOverlay('Fusionando datos...', 'Combinando inventarios locales en la nube.');
+  try {
+    const res = await sheetsPost({ 
+      action: 'mergeProducts', 
+      products: state.products,
+      categories: state.categories,
+      quickIds: state.quickIds,
+      compraList: state.compraList
+    });
+    
+    if (res.ok) {
+      toast(`✅ Fusionado: ${res.added} nuevos, ${res.updated} actualizados`);
+      // Después de fusionar, forzar un pull para que este dispositivo tenga la versión consolidada
+      await pullFromSheets();
+      _hideNoSyncBanner();
+    } else {
+      throw new Error(res.error);
+    }
+  } catch(e) {
+    alert('Error al fusionar: ' + e.message);
+  } finally {
+    _hideSyncOverlay();
+  }
 }
 
 function openSyncSetup() {

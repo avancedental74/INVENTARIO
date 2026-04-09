@@ -39,6 +39,7 @@ function doPost(e) {
       case 'deleteProduct':  return jsonResponse(handleDeleteProduct(body));
       case 'addAllProducts': return jsonResponse(handleAddAllProducts(body));
       case 'setMeta':        return jsonResponse(handleSetMeta(body));
+      case 'mergeProducts':  return jsonResponse(handleMergeProducts(body));
       default: return jsonResponse({ ok: false, error: 'Acción POST no reconocida: ' + action });
     }
   } catch(err) {
@@ -160,27 +161,77 @@ function handleDeleteProduct(body) {
   return { ok: true };
 }
 
+function handleMergeProducts(body) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet(SHEET_INVENTORY);
+    const incoming = body.products || [];
+    const data = sheet.getDataRange().getValues();
+    const existing = {};
+    
+    // Mapear lo que ya hay en el Sheet
+    for (let i = 1; i < data.length; i++) {
+       const id = Number(data[i][COL_ID - 1]);
+       existing[id] = i + 1; // Guardar número de fila
+    }
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    incoming.forEach(p => {
+      const row = existing[p.id];
+      const rowData = [
+        Number(p.id),
+        String(p.nombre),
+        String(p.categoria),
+        Number(p.stock),
+        Number(p.minimo || 2),
+        Number(p.updatedAt || Date.now())
+      ];
+
+      if (row) {
+        // Solo actualizar si el entrante es más reciente o si el stock es diferente (Merge simple)
+        // Para seguridad, simplemente actualizamos la fila si existe
+        sheet.getRange(row, 1, 1, 6).setValues([rowData]);
+        updatedCount++;
+      } else {
+        sheet.appendRow(rowData);
+        addedCount++;
+      }
+    });
+
+    if (body.categories) setMeta('categories', body.categories);
+    if (body.quickIds)   setMeta('quickIds',   body.quickIds);
+    // Para compraList y history, al ser meta-datos, hacemos merge simple (concatenar no-duplicados)
+    if (body.compraList) {
+      const current = getMeta('compraList') || [];
+      const merged = [...current];
+      body.compraList.forEach(item => {
+        if (!merged.find(m => m.id === item.id)) merged.push(item);
+      });
+      setMeta('compraList', merged);
+    }
+
+    return { ok: true, added: addedCount, updated: updatedCount };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function handleAddAllProducts(body) {
+  // Solo usar para sobreescritura total inicial si se desea limpiar todo
   const sheet = getOrCreateSheet(SHEET_INVENTORY);
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
 
   const products = body.products || [];
-  const now      = Date.now();
-  const rows     = products.map(p => [
-    Number(p.id),
-    String(p.nombre    || ''),
-    String(p.categoria || ''),
-    Number(p.stock     || 0),
-    Number(p.minimo    || 2),
-    Number(p.updatedAt || now),
+  const rows = products.map(p => [
+    Number(p.id), String(p.nombre), String(p.categoria), 
+    Number(p.stock), Number(p.minimo), Number(p.updatedAt || Date.now())
   ]);
 
   if (rows.length > 0) sheet.getRange(2, 1, rows.length, 6).setValues(rows);
-  if (body.categories) setMeta('categories', body.categories);
-  if (body.quickIds)   setMeta('quickIds',   body.quickIds);
-  if (body.compraList) setMeta('compraList', body.compraList);
-
   return { ok: true, count: rows.length };
 }
 
