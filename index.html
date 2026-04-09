@@ -2047,7 +2047,7 @@ function setupDesktop() {
 const HARDCODED_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzSmAyUIcPk4GRAQjM-ogNuzP7l06_yYPGGV9lX3q6YvmKzcaUQV9pO6tvbaXSwlS8naw/exec';
 const SHEETS_URL_KEY   = 'avancedental_sheets_url';
 const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
-const SYNC_INTERVAL_MS = 20000;
+const SYNC_INTERVAL_MS = 8000;
 const DEVICE_ID        = (() => {
   let id = localStorage.getItem('avancedental_device_id');
   if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,8); localStorage.setItem('avancedental_device_id', id); }
@@ -2107,7 +2107,7 @@ function setSyncState(st, label) {
   if (lbl) lbl.textContent = label;
   if (bar) bar.classList.toggle('syncing', st === 'syncing');
   const footer = document.getElementById('syncFooter');
-  const ts = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const ts = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
   if (footer) {
     const fm = { local:'Offline', ok:'☁️ Sync · '+ts, error:'⚠️ Error Sync', syncing:'🔄 Sync...' };
     footer.textContent = fm[st] || '...';
@@ -2189,7 +2189,7 @@ function startAutoSync() {
   if (_syncTimer) clearInterval(_syncTimer);
   _syncTimer = setInterval(() => {
     if (document.visibilityState === 'visible' && _syncPendingCount === 0) pullFromSheets();
-  }, SYNC_INTERVAL_MS + (Math.random() * 5000));
+  }, SYNC_INTERVAL_MS + (Math.random() * 2000));
 }
 
 function _initBroadcastChannel() {
