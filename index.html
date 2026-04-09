@@ -2202,7 +2202,9 @@ async function sheetsPost(body) {
   if (!_sheetsUrl) throw new Error('URL no configurada');
   const res = await fetch(_sheetsUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // text/plain evita el preflight CORS que GAS no puede responder.
+    // El backend recibe el JSON igualmente via e.postData.contents.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body),
     redirect: 'follow',
   });
