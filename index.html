@@ -913,7 +913,7 @@
       </div>
 
       <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:12px">
-        Avance Dental Inventario v3.0 · Google Sheets Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
+        Avance Dental Inventario v3.1 · Google Sheets Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
       </div>
     </div>
 
@@ -987,8 +987,10 @@
     <div id="syncTestResult" style="display:none;padding:12px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:13px"></div>
 
     <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:14px">
-      🔒 La URL se guarda solo en este dispositivo.<br>
-      Comparte el mismo Google Sheet con todos los dispositivos.
+      🔒 La URL se guarda en este dispositivo.<br>
+      Todos los dispositivos deben apuntar al mismo Google Sheet.<br>
+      <strong>Tip:</strong> Para no configurar cada dispositivo, pide al admin que<br>
+      hardcodee la URL en el código fuente (constante <code>HARDCODED_SHEETS_URL</code>).
     </div>
 
     <button class="btn-secondary" style="width:100%" onclick="closeModal('modalSync')">Cerrar</button>
@@ -2032,15 +2034,36 @@ function setupDesktop() {
 // ═══════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
-//  GOOGLE SHEETS SYNC LAYER v3.0
+//  GOOGLE SHEETS SYNC LAYER v3.1  (parche MVF — 2025)
 //  Backend: Google Apps Script Web App
 //  Modelo: Operaciones atómicas por celda — sin race conditions
-//  Polling cada 4s + BroadcastChannel instantáneo entre tabs
+//  Polling cada 20s + jitter + BroadcastChannel entre tabs
+//
+//  ── CAUSA RAÍZ CORREGIDA ──────────────────────────────────────
+//  La URL del backend estaba solo en localStorage por dispositivo.
+//  Un dispositivo nuevo arrancaba en modo local silencioso sin
+//  ningún aviso. Correcciones aplicadas:
+//    1. HARDCODED_SHEETS_URL: si se rellena aquí, todos los
+//       dispositivos apuntan al mismo backend desde el primer
+//       arranque sin configuración manual.
+//    2. Banner persistente ámbar cuando no hay URL configurada.
+//    3. Polling reducido a 20s + jitter para no agotar quota GAS.
+//    4. Retry con exponential backoff en pushUseStock/pushAddStock.
+//    5. Rollback local si el push agota todos los reintentos.
+//    6. Pull inmediato al volver al tab (visibilitychange ya existía).
 // ═══════════════════════════════════════════════════════════════
+
+// ── Hardcodea aquí la URL del Apps Script para evitar configuración
+// manual en cada dispositivo. Si lo dejas vacío, cada dispositivo
+// deberá pegarla manualmente en Ajustes → Google Sheets.
+// Ejemplo: 'https://script.google.com/macros/s/AKfy.../exec'
+const HARDCODED_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzSmAyUIcPk4GRAQjM-ogNuzP7l06_yYPGGV9lX3q6YvmKzcaUQV9pO6tvbaXSwlS8naw/exec';
 
 const SHEETS_URL_KEY   = 'avancedental_sheets_url';
 const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
-const SYNC_INTERVAL_MS = 4000;
+// 20 000 ms base + jitter aplicado en startAutoSync()
+// (era 4 000 ms — demasiado agresivo, agotaba quota de Google Apps Script)
+const SYNC_INTERVAL_MS = 20000;
 const DEVICE_ID        = (() => {
   let id = localStorage.getItem('avancedental_device_id');
   if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,8); localStorage.setItem('avancedental_device_id', id); }
@@ -2082,6 +2105,55 @@ function _showSyncOverlay(msg) {
 function _hideSyncOverlay() {
   var el = document.getElementById('syncOverlay');
   if (el) el.remove();
+}
+
+// ── Banner persistente de "modo local / sin sync" ────────────
+// Se muestra cuando no hay URL configurada o cuando la conexion falla.
+// Se oculta automaticamente cuando el pull tiene exito.
+function _showNoSyncBanner(msg) {
+  // Si ya existe, solo actualizar el mensaje si se pasa uno nuevo
+  const existing = document.getElementById('noSyncBanner');
+  const text = msg || '⚠️ Sin sincronización — los cambios no se comparten con otros dispositivos.';
+  if (existing) {
+    const span = existing.querySelector('#noSyncBannerMsg');
+    if (span) span.textContent = text;
+    return;
+  }
+  const b = document.createElement('div');
+  b.id = 'noSyncBanner';
+  b.style.cssText = [
+    'position:fixed',
+    'bottom:calc(var(--bottom-h) + 10px)',
+    'left:12px',
+    'right:12px',
+    'background:var(--amber-light)',
+    'border:1.5px solid var(--amber)',
+    'border-radius:var(--radius)',
+    'padding:10px 14px',
+    'display:flex',
+    'align-items:center',
+    'gap:10px',
+    'z-index:500',
+    'box-shadow:var(--shadow-md)',
+    'animation:slideUp 0.25s cubic-bezier(0.4,0,0.2,1)'
+  ].join(';');
+  b.innerHTML = `
+    <span style="font-size:20px;flex-shrink:0">⚠️</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;color:var(--amber)">Modo local activo</div>
+      <div id="noSyncBannerMsg" style="font-size:12px;color:var(--text2);margin-top:1px;line-height:1.4">${text}</div>
+    </div>
+    <button onclick="openSyncSetup()" style="
+      background:var(--amber);color:#fff;border:none;
+      border-radius:var(--radius-sm);padding:6px 12px;
+      font-family:var(--font);font-size:12px;font-weight:600;
+      cursor:pointer;flex-shrink:0;white-space:nowrap
+    ">Configurar</button>`;
+  document.body.appendChild(b);
+}
+
+function _hideNoSyncBanner() {
+  document.getElementById('noSyncBanner')?.remove();
 }
 
 // ── UI helpers ──────────────────────────────────────────────
@@ -2141,8 +2213,10 @@ async function sheetsPost(body) {
 }
 
 // ── Cargar URL guardada ──────────────────────────────────────
+// Prioridad: URL hardcodeada en el código > URL guardada en localStorage.
+// Si ninguna está disponible, se muestra el banner de "modo local".
 function loadSheetsCredentials() {
-  _sheetsUrl = localStorage.getItem(SHEETS_URL_KEY) || '';
+  _sheetsUrl = HARDCODED_SHEETS_URL || localStorage.getItem(SHEETS_URL_KEY) || '';
   const inp = document.getElementById('sheetsUrlInput');
   if (inp && _sheetsUrl) inp.value = _sheetsUrl;
   if (_sheetsUrl) {
@@ -2151,6 +2225,9 @@ function loadSheetsCredentials() {
     if (s4) s4.classList.add('done');
   } else {
     setSyncState('local', 'Local');
+    // Sin URL -> modo local. Banner persistente para que el usuario sepa
+    // que sus cambios NO se sincronizan con otros dispositivos.
+    _showNoSyncBanner();
   }
 }
 
@@ -2168,11 +2245,21 @@ async function saveSheetsUrl() {
   try {
     await sheetsCall({ action: 'ping' });
     localStorage.setItem(SHEETS_URL_KEY, _sheetsUrl);
+    // Ocultar el banner de "modo local" ahora que hay conexión
+    _hideNoSyncBanner();
     showSyncTestResult('ok', '✅ Conectado. Ahora pulsa "Subir inventario local" en Ajustes para cargar tus datos.');
     setSyncState('ok', 'Sheets');
     const s4 = document.getElementById('step4num');
     if (s4) s4.classList.add('done');
-    startAutoSync();
+    // Si el dispositivo no tiene datos propios aún, hacer pull inmediato
+    if (!localStorage.getItem('avancedental_v2')) {
+      _showSyncOverlay('Cargando inventario...');
+      const _t = setTimeout(() => { _hideSyncOverlay(); _syncReady = true; }, 15000);
+      pullFromSheets().then(() => { clearTimeout(_t); startAutoSync(); })
+                      .catch(() => { clearTimeout(_t); _hideSyncOverlay(); _syncReady = true; });
+    } else {
+      startAutoSync();
+    }
   } catch(e) {
     showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la URL sea correcta y que la web app esté publicada.');
   }
@@ -2204,6 +2291,7 @@ async function pullFromSheets() {
     _lastSyncTs = Date.now();
     _syncReady  = true;
     _hideSyncOverlay();
+    _hideNoSyncBanner();   // pull OK -> la conexion esta activa, ocultar aviso
     setSyncState('ok', 'Sheets');
     return true;
   } catch(e) {
@@ -2219,44 +2307,73 @@ async function pullFromSheets() {
 // ── useStock atómico: solo modifica esa celda en Sheets ──────
 async function pushUseStock(productId, qty) {
   if (!_sheetsUrl) return;
-  try {
-    const data = await sheetsPost({ action: 'useStock', id: productId, qty, device: DEVICE_ID });
-    // Actualizar el stock local con el valor real del servidor (evita desfase)
-    const p = state.products.find(x => x.id === productId);
-    if (p && data.stock !== undefined) {
-      p.stock = data.stock;
-      saveState();
-      renderAll();
+  const p = state.products.find(x => x.id === productId);
+  const prevStock = p ? p.stock : null; // guardar para rollback si falla todo
+
+  const attempt = async (retries, delay) => {
+    try {
+      const data = await sheetsPost({ action: 'useStock', id: productId, qty, device: DEVICE_ID });
+      // Actualizar el stock local con el valor real del servidor (evita desfase)
+      if (p && data.stock !== undefined) {
+        p.stock = data.stock;
+        saveState();
+        renderAll();
+      }
+      // Sincronizar tambien compraList (puede haberse modificado por addToCompra)
+      pushMeta('compraList', state.compraList);
+      _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
+    } catch(e) {
+      if (retries > 0) {
+        await new Promise(r => setTimeout(r, delay));
+        return attempt(retries - 1, Math.min(delay * 2, 8000));
+      }
+      // Sin mas reintentos: rollback del stock local al valor previo
+      if (p && prevStock !== null) {
+        p.stock = prevStock;
+        saveState();
+        renderAll();
+      }
+      setSyncState('error', 'Error');
+      toast('⚠️ Error de sync: no se pudo guardar en Sheets. Stock revertido.');
+      console.warn('Sheets useStock error (sin reintentos):', e.message);
     }
-    // Sincronizar también compraList (puede haberse modificado por addToCompra)
-    pushMeta('compraList', state.compraList);
-    _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('⚠️ Error de sync: ' + e.message);
-    console.warn('Sheets useStock error:', e.message);
-  }
+  };
+  await attempt(3, 1000);
 }
 
 // ── addStock atómico ─────────────────────────────────────────
 async function pushAddStock(productId, qty) {
   if (!_sheetsUrl) return;
-  try {
-    const data = await sheetsPost({ action: 'addStock', id: productId, qty, device: DEVICE_ID });
-    const p = state.products.find(x => x.id === productId);
-    if (p && data.stock !== undefined) {
-      p.stock = data.stock;
-      saveState();
-      renderAll();
+  const p = state.products.find(x => x.id === productId);
+  const prevStock = p ? p.stock : null;
+
+  const attempt = async (retries, delay) => {
+    try {
+      const data = await sheetsPost({ action: 'addStock', id: productId, qty, device: DEVICE_ID });
+      if (p && data.stock !== undefined) {
+        p.stock = data.stock;
+        saveState();
+        renderAll();
+      }
+      // Sincronizar compraList (confirmAdd puede haber marcado items como done)
+      pushMeta('compraList', state.compraList);
+      _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
+    } catch(e) {
+      if (retries > 0) {
+        await new Promise(r => setTimeout(r, delay));
+        return attempt(retries - 1, Math.min(delay * 2, 8000));
+      }
+      if (p && prevStock !== null) {
+        p.stock = prevStock;
+        saveState();
+        renderAll();
+      }
+      setSyncState('error', 'Error');
+      toast('⚠️ Error de sync: no se pudo guardar en Sheets. Stock revertido.');
+      console.warn('Sheets addStock error (sin reintentos):', e.message);
     }
-    // Sincronizar compraList (confirmAdd puede haber marcado ítems como done)
-    pushMeta('compraList', state.compraList);
-    _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('⚠️ Error de sync: ' + e.message);
-    console.warn('Sheets addStock error:', e.message);
-  }
+  };
+  await attempt(3, 1000);
 }
 
 // ── Operaciones de meta (compra, categorías, quickIds) ───────
@@ -2367,9 +2484,12 @@ function startAutoSync() {
   if (_syncTimer) clearInterval(_syncTimer);
   if (!_sheetsUrl) return;
   _initBroadcastChannel();
+  // Jitter de hasta 4s para evitar que varios dispositivos hagan
+  // poll exactamente al mismo tiempo y agoten la quota de GAS.
+  const jitter = Math.floor(Math.random() * 4000);
   _syncTimer = setInterval(() => {
     if (!document.hidden && !_syncing) pullFromSheets();
-  }, SYNC_INTERVAL_MS);
+  }, SYNC_INTERVAL_MS + jitter);
   if (!_visibilityListenerAdded) {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && _sheetsUrl) pullFromSheets();
@@ -2405,30 +2525,43 @@ function initSync() {
     if (_isNewDevice) {
       // Dispositivo nuevo: mostrar overlay y ESPERAR al pull antes de permitir cualquier acción
       _showSyncOverlay('Conectando con el inventario...');
-      // Timeout de 15s: si Sheets no responde, entra en modo local para no quedar bloqueado
+      // Timeout de 15s: si Sheets no responde, entra en modo advertencia (no silencioso)
       const _overlayTimeout = setTimeout(() => {
         _hideSyncOverlay();
         _syncReady = true;
-        toast('⚠️ No se pudo conectar con Sheets. Usando datos locales.');
+        // Mostrar banner de advertencia — el dispositivo tiene datos INITIAL_PRODUCTS
+        // que NO son el inventario real. El usuario debe saber que hay problema.
+        _showNoSyncBanner('⚠️ No se pudo conectar con Sheets. Los datos mostrados pueden no estar actualizados.');
+        toast('⚠️ Timeout al conectar con Sheets. Revisa la conexión.');
       }, 15000);
-      pullFromSheets().then(() => {
+      pullFromSheets().then(ok => {
         clearTimeout(_overlayTimeout);
         startAutoSync();
-        toast('✅ Inventario cargado desde Google Sheets');
+        if (ok) {
+          _hideNoSyncBanner();
+          toast('✅ Inventario cargado desde Google Sheets');
+        } else {
+          _showNoSyncBanner('⚠️ Error al cargar desde Sheets. Reintentando...');
+        }
       }).catch(() => {
         clearTimeout(_overlayTimeout);
         _hideSyncOverlay();
         _syncReady = true;
-        toast('⚠️ Error al conectar con Sheets. Usando datos locales.');
+        _showNoSyncBanner('⚠️ Error al conectar con Sheets. Los datos pueden no estar actualizados.');
+        toast('⚠️ Error al conectar con Sheets. Revisa la URL en Ajustes.');
       });
     } else {
-      // Dispositivo conocido: tiene datos locales válidos → pull en background sin bloquear
-      _syncReady = true;    // ya tiene datos locales, puede escribir mientras llega el pull
-      pullFromSheets().then(() => startAutoSync());
+      // Dispositivo conocido: tiene datos locales validos -> pull en background sin bloquear
+      _syncReady = true;
+      pullFromSheets().then(ok => {
+        startAutoSync();
+        if (ok) _hideNoSyncBanner();
+      });
     }
   } else {
-    // Sin Sheets configurado → modo local, todo permitido
+    // Sin Sheets configurado -> modo local explícito, banner ya visible desde loadSheetsCredentials
     _syncReady = true;
+    // El banner _showNoSyncBanner() ya fue llamado en loadSheetsCredentials()
   }
 
   // ── confirmUse: descuenta atómicamente en Sheets ──────────
@@ -2638,7 +2771,7 @@ window.addEventListener('load', checkIOSInstall);
 // ═══════════════════════════════════════
 
 // ── VERSIÓN DE LA APP — incrementa este número cada vez que subas cambios a GitHub ──
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.1';
 
 async function checkForUpdate() {
   try {

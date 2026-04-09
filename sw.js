@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-//  AVANCE DENTAL — Service Worker v3.0
+//  AVANCE DENTAL — Service Worker v3.1
 //  Estrategia: Cache-first para assets, Network-only para APIs
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'avancedental-v3';
+const CACHE_NAME = 'avancedental-v3.1';
 const ASSETS_TO_CACHE = [
   './',
   // index.html NO se cachea: el SW lo sirviría en lugar de la versión nueva
