@@ -1605,6 +1605,7 @@ function confirmUse() {
   closeModal('modalUse');
   renderAll();
   toast(`✅ −${useQty} ${p.nombre}`);
+  if (_sheetsUrl) pushUseStock(p.id, useQty);
 }
 
 // ═══════════════════════════════════════
@@ -1638,6 +1639,7 @@ function confirmAdd() {
   closeModal('modalAdd');
   renderAll();
   toast(`✅ +${addQty} ${p.nombre} · Stock: ${p.stock}`);
+  if (_sheetsUrl) pushAddStock(p.id, addQty);
 }
 
 // ═══════════════════════════════════════
@@ -1668,6 +1670,7 @@ function confirmNewProduct() {
   closeModal('modalNewProduct');
   renderAll();
   toast(`✅ Producto añadido: ${prod.nombre}`);
+  if (_sheetsUrl) pushNewProduct(prod);
 }
 
 // ═══════════════════════════════════════
@@ -1687,15 +1690,18 @@ function openEditModal(id) {
 function confirmEdit() {
   const id = parseInt(document.getElementById('editProdId').value);
   const p = state.products.find(x => x.id === id);
-  if (!p) return;
-  p.nombre = document.getElementById('editProdName').value.trim() || p.nombre;
-  p.stock = parseInt(document.getElementById('editProdStock').value) || 0;
-  p.minimo = parseInt(document.getElementById('editProdMin').value) || 2;
-  p.categoria = document.getElementById('editProdCat').value;
+  const changes = {
+    nombre: document.getElementById('editProdName').value.trim() || p.nombre,
+    stock: parseInt(document.getElementById('editProdStock').value) || 0,
+    minimo: parseInt(document.getElementById('editProdMin').value) || 2,
+    categoria: document.getElementById('editProdCat').value
+  };
+  Object.assign(p, changes);
   saveState();
   closeModal('modalEdit');
   renderAll();
   toast('✅ Producto actualizado');
+  if (_sheetsUrl) sheetsPost({ action: 'editProduct', id: p.id, changes });
 }
 function deleteProduct() {
   const id = parseInt(document.getElementById('editProdId').value);
@@ -1706,6 +1712,7 @@ function deleteProduct() {
   closeModal('modalEdit');
   renderAll();
   toast('🗑 Producto eliminado');
+  if (_sheetsUrl) sheetsPost({ action: 'deleteProduct', id });
 }
 
 // ═══════════════════════════════════════
@@ -2031,38 +2038,15 @@ function setupDesktop() {
 }
 
 
-// ═══════════════════════════════════════
-
 // ═══════════════════════════════════════════════════════════════
-//  GOOGLE SHEETS SYNC LAYER v3.1  (parche MVF — 2025)
+//  GOOGLE SHEETS SYNC LAYER v3.2  (parche MVF — 2025)
 //  Backend: Google Apps Script Web App
-//  Modelo: Operaciones atómicas por celda — sin race conditions
-//  Polling cada 20s + jitter + BroadcastChannel entre tabs
-//
-//  ── CAUSA RAÍZ CORREGIDA ──────────────────────────────────────
-//  La URL del backend estaba solo en localStorage por dispositivo.
-//  Un dispositivo nuevo arrancaba en modo local silencioso sin
-//  ningún aviso. Correcciones aplicadas:
-//    1. HARDCODED_SHEETS_URL: si se rellena aquí, todos los
-//       dispositivos apuntan al mismo backend desde el primer
-//       arranque sin configuración manual.
-//    2. Banner persistente ámbar cuando no hay URL configurada.
-//    3. Polling reducido a 20s + jitter para no agotar quota GAS.
-//    4. Retry con exponential backoff en pushUseStock/pushAddStock.
-//    5. Rollback local si el push agota todos los reintentos.
-//    6. Pull inmediato al volver al tab (visibilitychange ya existía).
+//  Modelo: Fuente de Verdad compartida con Handshake de ID
 // ═══════════════════════════════════════════════════════════════
 
-// ── Hardcodea aquí la URL del Apps Script para evitar configuración
-// manual en cada dispositivo. Si lo dejas vacío, cada dispositivo
-// deberá pegarla manualmente en Ajustes → Google Sheets.
-// Ejemplo: 'https://script.google.com/macros/s/AKfy.../exec'
 const HARDCODED_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzSmAyUIcPk4GRAQjM-ogNuzP7l06_yYPGGV9lX3q6YvmKzcaUQV9pO6tvbaXSwlS8naw/exec';
-
 const SHEETS_URL_KEY   = 'avancedental_sheets_url';
 const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
-// 20 000 ms base + jitter aplicado en startAutoSync()
-// (era 4 000 ms — demasiado agresivo, agotaba quota de Google Apps Script)
 const SYNC_INTERVAL_MS = 20000;
 const DEVICE_ID        = (() => {
   let id = localStorage.getItem('avancedental_device_id');
@@ -2075,107 +2059,228 @@ let _syncTimer   = null;
 let _bc          = null;
 let _lastSyncTs  = 0;
 let _syncing     = false;
+let _syncReady   = false;
+let _syncPendingCount = 0;
 
-// ── Guard: bloquea escrituras hasta el primer pull completado ─
-// Evita que un dispositivo nuevo (con stock 0) sobreescriba Sheets
-let _syncReady   = false;   // true = ya recibimos datos de Sheets al menos 1 vez
-let _isNewDevice = false;   // true = localStorage vacío al arrancar (dispositivo nuevo)
+function _isSyncReady() { return !_sheetsUrl || _syncReady; }
 
-function _isSyncReady() {
-  if (!_sheetsUrl) return true;   // sin Sheets configurado → modo local, ok
-  return _syncReady;
-}
-
-function _showSyncOverlay(msg) {
+function _showSyncOverlay(msg, sub) {
   if (document.getElementById('syncOverlay')) return;
   const el = document.createElement('div');
   el.id = 'syncOverlay';
-  el.style.cssText = [
-    'position:fixed','inset:0','z-index:9000',
-    'background:var(--bg)',
-    'display:flex','flex-direction:column','align-items:center','justify-content:center','gap:16px'
-  ].join(';');
-  el.innerHTML =
-    '<div style="font-size:48px;animation:syncPulse 1s ease-in-out infinite">\u2601\ufe0f</div>' +
-    '<div style="font-size:16px;font-weight:600;color:var(--text)">' + msg + '</div>' +
-    '<div style="font-size:13px;color:var(--text3)">Obteniendo inventario actualizado...</div>';
+  el.style.cssText = 'position:fixed;inset:0;z-index:9000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center';
+  el.innerHTML = `
+    <div style="font-size:48px;animation:syncPulse 1s ease-in-out infinite">☁️</div>
+    <div style="font-size:18px;font-weight:700;color:var(--text)">${msg}</div>
+    <div style="font-size:14px;color:var(--text2);max-width:300px">${sub || 'Confirmando estado con el servidor...'}</div>
+    <div id="syncOverlayActions" style="margin-top:12px"></div>
+  `;
   document.body.appendChild(el);
 }
 
-function _hideSyncOverlay() {
-  var el = document.getElementById('syncOverlay');
-  if (el) el.remove();
-}
+function _hideSyncOverlay() { document.getElementById('syncOverlay')?.remove(); }
 
-// ── Banner persistente de "modo local / sin sync" ────────────
-// Se muestra cuando no hay URL configurada o cuando la conexion falla.
-// Se oculta automaticamente cuando el pull tiene exito.
-function _showNoSyncBanner(msg) {
-  // Si ya existe, solo actualizar el mensaje si se pasa uno nuevo
-  const existing = document.getElementById('noSyncBanner');
-  const text = msg || '⚠️ Sin sincronización — los cambios no se comparten con otros dispositivos.';
-  if (existing) {
-    const span = existing.querySelector('#noSyncBannerMsg');
-    if (span) span.textContent = text;
-    return;
-  }
+function _showNoSyncBanner(msg, type = 'amber') {
+  document.getElementById('noSyncBanner')?.remove();
+  const colors = { amber:['var(--amber-light)','var(--amber)'], red:['var(--red-light)','var(--red)'] };
+  const [bg, border] = colors[type] || colors.amber;
   const b = document.createElement('div');
   b.id = 'noSyncBanner';
-  b.style.cssText = [
-    'position:fixed',
-    'bottom:calc(var(--bottom-h) + 10px)',
-    'left:12px',
-    'right:12px',
-    'background:var(--amber-light)',
-    'border:1.5px solid var(--amber)',
-    'border-radius:var(--radius)',
-    'padding:10px 14px',
-    'display:flex',
-    'align-items:center',
-    'gap:10px',
-    'z-index:500',
-    'box-shadow:var(--shadow-md)',
-    'animation:slideUp 0.25s cubic-bezier(0.4,0,0.2,1)'
-  ].join(';');
+  b.style.cssText = `position:fixed;bottom:calc(var(--bottom-h) + 12px);left:12px;right:12px;background:${bg};border:1.5px solid ${border};border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:500;box-shadow:var(--shadow-md);animation:slideUp 0.3s ease-out`;
   b.innerHTML = `
-    <span style="font-size:20px;flex-shrink:0">⚠️</span>
+    <span style="font-size:22px">${type==='red'?'🚫':'⚠️'}</span>
     <div style="flex:1;min-width:0">
-      <div style="font-size:13px;font-weight:600;color:var(--amber)">Modo local activo</div>
-      <div id="noSyncBannerMsg" style="font-size:12px;color:var(--text2);margin-top:1px;line-height:1.4">${text}</div>
+      <div id="noSyncBannerMsg" style="font-size:13px;color:var(--text);line-height:1.4">${msg}</div>
     </div>
-    <button onclick="openSyncSetup()" style="
-      background:var(--amber);color:#fff;border:none;
-      border-radius:var(--radius-sm);padding:6px 12px;
-      font-family:var(--font);font-size:12px;font-weight:600;
-      cursor:pointer;flex-shrink:0;white-space:nowrap
-    ">Configurar</button>`;
+    <button onclick="openSyncSetup()" style="background:${border};color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">Panel</button>`;
   document.body.appendChild(b);
 }
 
-function _hideNoSyncBanner() {
-  document.getElementById('noSyncBanner')?.remove();
-}
+function _hideNoSyncBanner() { document.getElementById('noSyncBanner')?.remove(); }
 
-// ── UI helpers ──────────────────────────────────────────────
 function setSyncState(st, label) {
-  const el  = document.getElementById('syncStatus');
+  const el = document.getElementById('syncStatus');
   const lbl = document.getElementById('syncLabel');
   const bar = document.getElementById('syncBar');
   if (!el) return;
   el.className = st;
-  lbl.textContent = label;
-  bar.classList.toggle('syncing', st === 'syncing');
-  const sub    = document.getElementById('syncSettingsSub');
+  if (lbl) lbl.textContent = label;
+  if (bar) bar.classList.toggle('syncing', st === 'syncing');
   const footer = document.getElementById('syncFooter');
-  const ts     = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-  if (sub) {
-    const msgs = { local:'Sin configurar', ok:`Conectado · ${ts}`, error:'Error de conexión', syncing:'Sincronizando...' };
-    sub.textContent = msgs[st] || '';
-  }
+  const ts = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
   if (footer) {
-    const fm = { local:'Datos locales', ok:'☁️ Sheets · ' + ts, error:'⚠️ Error sync', syncing:'🔄 Sync...' };
-    footer.textContent = fm[st] || '';
+    const fm = { local:'Offline', ok:'☁️ Sync · '+ts, error:'⚠️ Error Sync', syncing:'🔄 Sync...' };
+    footer.textContent = fm[st] || '...';
   }
+}
+
+async function sheetsCall(params) {
+  if (!_sheetsUrl) throw new Error('URL vacía');
+  const url = _sheetsUrl + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url, { redirect: 'follow' });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  return data;
+}
+
+async function sheetsPost(body) {
+  if (!_sheetsUrl) throw new Error('URL vacía');
+  const res = await fetch(_sheetsUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({...body, deviceId: DEVICE_ID}),
+    redirect: 'follow',
+  });
+  const data = await res.json();
+  if (!data || !data.ok) throw new Error((data && data.error) || 'CORS/Network error');
+  return data;
+}
+
+function loadSheetsCredentials() {
+  _sheetsUrl = HARDCODED_SHEETS_URL || localStorage.getItem(SHEETS_URL_KEY) || '';
+  if (!_sheetsUrl) _showNoSyncBanner('<b>Modo Local Activo:</b> No hay conexión con el servidor.');
+}
+
+async function pullFromSheets() {
+  if (!_sheetsUrl || _syncing) return;
+  _syncing = true;
+  setSyncState('syncing', 'Sync...');
+  try {
+    const data = await sheetsCall({ action: 'getAll' });
+    if (data.products) {
+      if (data.products.length > 0) {
+        state.products = data.products;
+        state.categories = (data.categories && data.categories.length) ? data.categories : state.categories;
+        state.quickIds = (data.quickIds && data.quickIds.length) ? data.quickIds : state.quickIds;
+        state.compraList = data.compraList || [];
+        state.history = data.history || [];
+        saveState(); renderAll();
+        _syncReady = true; _hideSyncOverlay(); _hideNoSyncBanner();
+        setSyncState('ok', 'Sheets');
+      } else {
+        _syncReady = true; _hideNoSyncBanner();
+        const isActuallyNew = !localStorage.getItem('avancedental_v2');
+        if (!isActuallyNew && state.products.length > 0) {
+           _showNoSyncBanner('Hoja vacía. Sube tu inventario local.', 'amber');
+        }
+        setSyncState('ok', 'Vacío');
+      }
+    }
+  } catch(e) {
+    console.warn('Pull error:', e);
+    setSyncState('error', 'Error');
+  } finally { _syncing = false; _lastSyncTs = Date.now(); }
+}
+
+async function initSync() {
+  loadSheetsCredentials();
+  if (!_sheetsUrl) return;
+  const isNew = !localStorage.getItem('avancedental_v2');
+  if (isNew) _showSyncOverlay('Conectando...', 'Sincronizando inventario por primera vez.');
+  try {
+    await pullFromSheets();
+  } catch(e) { console.error('InitSync failed:', e); }
+  _hideSyncOverlay();
+  startAutoSync();
+  _initBroadcastChannel();
+}
+
+function startAutoSync() {
+  if (_syncTimer) clearInterval(_syncTimer);
+  _syncTimer = setInterval(() => {
+    if (document.visibilityState === 'visible' && _syncPendingCount === 0) pullFromSheets();
+  }, SYNC_INTERVAL_MS + (Math.random() * 5000));
+}
+
+function _initBroadcastChannel() {
+  if (_bc) _bc.close();
+  _bc = new BroadcastChannel(BC_CHANNEL_NAME);
+  _bc.onmessage = (e) => {
+    if (e.data.type === 'REFRESH' && e.data.sender !== DEVICE_ID) pullFromSheets();
+  };
+}
+
+function _notifyRefresh() { _bc?.postMessage({ type: 'REFRESH', sender: DEVICE_ID }); }
+
+async function pushUseStock(id, qty) {
+  if (!_sheetsUrl) return;
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  _syncPendingCount++;
+  try {
+    const res = await sheetsPost({ action: 'useStock', id, qty, clientStock: p.stock + qty });
+    if (res.ok) { p.stock = res.stock; saveState(); renderAll(); _notifyRefresh(); }
+  } catch(e) { toast('⚠️ Error de sync'); }
+  finally { _syncPendingCount--; }
+}
+
+async function pushAddStock(id, qty) {
+  if (!_sheetsUrl) return;
+  _syncPendingCount++;
+  try {
+    const res = await sheetsPost({ action: 'addStock', id, qty });
+    if (res.ok) {
+       const p = state.products.find(x => x.id === id);
+       if (p) { p.stock = res.stock; saveState(); renderAll(); _notifyRefresh(); }
+    }
+  } catch(e) { toast('⚠️ Error de sync Add'); }
+  finally { _syncPendingCount--; }
+}
+
+async function pushNewProduct(localProd) {
+  if (!_sheetsUrl) return;
+  _syncPendingCount++;
+  try {
+    const res = await sheetsPost({ action: 'addProduct', product: localProd });
+    if (res.ok) {
+      const idx = state.products.findIndex(p => p.id === localProd.id);
+      if (idx !== -1) { state.products[idx].id = res.id; saveState(); renderAll(); _notifyRefresh(); }
+    }
+  } finally { _syncPendingCount--; }
+}
+
+async function pushEditProduct(id, changes) {
+  if (!_sheetsUrl) return;
+  try { await sheetsPost({ action: 'editProduct', id, changes }); _notifyRefresh(); } catch(e){}
+}
+
+async function pushDeleteProduct(id) {
+  if (!_sheetsUrl) return;
+  try { await sheetsPost({ action: 'deleteProduct', id }); _notifyRefresh(); } catch(e){}
+}
+
+async function pushMeta(key, value) {
+  if (!_sheetsUrl) return;
+  try { await sheetsPost({ action: 'setMeta', key, value }); } catch(e){}
+}
+
+// ── Sync Helpers ───────────────────────────────────────────
+async function saveSheetsUrl() {
+  const inp = document.getElementById('sheetsUrlInput');
+  const url = (inp ? inp.value : '').trim();
+  if (!url.includes('script.google.com')) {
+    showSyncTestResult('error', '⚠️ URL de Apps Script no válida.');
+    return;
+  }
+  _sheetsUrl = url;
+  showSyncTestResult('info', '🔄 Conectando...');
+  try {
+    await sheetsCall({ action: 'ping' });
+    localStorage.setItem(SHEETS_URL_KEY, _sheetsUrl);
+    _hideNoSyncBanner();
+    showSyncTestResult('ok', '✅ Conectado correctly.');
+    setSyncState('ok', 'Sheets');
+    initSync(); // Reiniciar sync con nueva URL
+  } catch(e) {
+    showSyncTestResult('error', '❌ Error: ' + e.message);
+  }
+}
+
+async function forcePullFromSheets() {
+  if (!_sheetsUrl) { openSyncSetup(); return; }
+  if (!confirm('¿Sincronizar ahora con Sheets?')) return;
+  await pullFromSheets();
+  toast('⬇️ Sincronización forzada completada');
 }
 
 function showSyncTestResult(type, msg) {
@@ -2187,327 +2292,6 @@ function showSyncTestResult(type, msg) {
   el.textContent = msg;
 }
 
-// ── Llamada al backend ───────────────────────────────────────
-async function sheetsCall(params) {
-  if (!_sheetsUrl) throw new Error('URL no configurada');
-  const url = _sheetsUrl + '?' + new URLSearchParams(params).toString();
-  const res  = await fetch(url, { redirect: 'follow' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error desconocido');
-  return data;
-}
-
-async function sheetsPost(body) {
-  if (!_sheetsUrl) throw new Error('URL no configurada');
-  const res = await fetch(_sheetsUrl, {
-    method: 'POST',
-    // text/plain evita el preflight CORS que GAS no puede responder.
-    // El backend recibe el JSON igualmente via e.postData.contents.
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-    redirect: 'follow',
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error desconocido');
-  return data;
-}
-
-// ── Cargar URL guardada ──────────────────────────────────────
-// Prioridad: URL hardcodeada en el código > URL guardada en localStorage.
-// Si ninguna está disponible, se muestra el banner de "modo local".
-function loadSheetsCredentials() {
-  _sheetsUrl = HARDCODED_SHEETS_URL || localStorage.getItem(SHEETS_URL_KEY) || '';
-  const inp = document.getElementById('sheetsUrlInput');
-  if (inp && _sheetsUrl) inp.value = _sheetsUrl;
-  if (_sheetsUrl) {
-    setSyncState('ok', 'Sheets');
-    const s4 = document.getElementById('step4num');
-    if (s4) s4.classList.add('done');
-  } else {
-    setSyncState('local', 'Local');
-    // Sin URL -> modo local. Banner persistente para que el usuario sepa
-    // que sus cambios NO se sincronizan con otros dispositivos.
-    _showNoSyncBanner();
-  }
-}
-
-// ── Guardar URL desde el modal ───────────────────────────────
-async function saveSheetsUrl() {
-  const inp = document.getElementById('sheetsUrlInput');
-  const url = (inp ? inp.value : '').trim();
-  if (!url.includes('script.google.com')) {
-    showSyncTestResult('error', '⚠️ La URL no es válida. Debe ser una URL de Google Apps Script.');
-    return;
-  }
-  _sheetsUrl = url;
-  showSyncTestResult('info', '🔄 Conectando con Google Sheets...');
-
-  try {
-    await sheetsCall({ action: 'ping' });
-    localStorage.setItem(SHEETS_URL_KEY, _sheetsUrl);
-    // Ocultar el banner de "modo local" ahora que hay conexión
-    _hideNoSyncBanner();
-    showSyncTestResult('ok', '✅ Conectado. Ahora pulsa "Subir inventario local" en Ajustes para cargar tus datos.');
-    setSyncState('ok', 'Sheets');
-    const s4 = document.getElementById('step4num');
-    if (s4) s4.classList.add('done');
-    // Si el dispositivo no tiene datos propios aún, hacer pull inmediato
-    if (!localStorage.getItem('avancedental_v2')) {
-      _showSyncOverlay('Cargando inventario...');
-      const _t = setTimeout(() => { _hideSyncOverlay(); _syncReady = true; }, 15000);
-      pullFromSheets().then(() => { clearTimeout(_t); startAutoSync(); })
-                      .catch(() => { clearTimeout(_t); _hideSyncOverlay(); _syncReady = true; });
-    } else {
-      startAutoSync();
-    }
-  } catch(e) {
-    showSyncTestResult('error', '❌ Error: ' + e.message + '. Revisa que la URL sea correcta y que la web app esté publicada.');
-  }
-}
-
-// ── getAll: obtiene el estado completo desde Sheets ─────────
-async function pullFromSheets() {
-  if (!_sheetsUrl) return false;
-  if (_syncing) return false;
-  _syncing = true;
-  setSyncState('syncing', 'Sync...');
-  try {
-    const data = await sheetsCall({ action: 'getAll' });
-    if (data.products && data.products.length > 0) {
-      state.products   = data.products;
-      state.compraList = data.compraList  || state.compraList;
-      state.categories = data.categories  || state.categories;
-      state.quickIds   = data.quickIds    || state.quickIds;
-      if (data.history && data.history.length > 0) state.history = data.history;
-      state.products.forEach(p => {
-        if (!state.categories.includes(p.categoria)) state.categories.push(p.categoria);
-      });
-      saveState();
-      renderAll();
-    } else if (data.products && data.products.length === 0 && _isNewDevice) {
-      // Sheets conectado pero vacío — avisar para que haga la migración
-      toast('⚠️ Google Sheets está vacío. Ve a Ajustes → Subir inventario local.');
-    }
-    _lastSyncTs = Date.now();
-    _syncReady  = true;
-    _hideSyncOverlay();
-    _hideNoSyncBanner();   // pull OK -> la conexion esta activa, ocultar aviso
-    setSyncState('ok', 'Sheets');
-    return true;
-  } catch(e) {
-    setSyncState('error', 'Error');
-    _hideSyncOverlay();
-    console.warn('Sheets pull error:', e.message);
-    return false;
-  } finally {
-    _syncing = false;
-  }
-}
-
-// ── useStock atómico: solo modifica esa celda en Sheets ──────
-async function pushUseStock(productId, qty) {
-  if (!_sheetsUrl) return;
-  const p = state.products.find(x => x.id === productId);
-  const prevStock = p ? p.stock : null; // guardar para rollback si falla todo
-
-  const attempt = async (retries, delay) => {
-    try {
-      const data = await sheetsPost({ action: 'useStock', id: productId, qty, device: DEVICE_ID });
-      // Actualizar el stock local con el valor real del servidor (evita desfase)
-      if (p && data.stock !== undefined) {
-        p.stock = data.stock;
-        saveState();
-        renderAll();
-      }
-      // Sincronizar tambien compraList (puede haberse modificado por addToCompra)
-      pushMeta('compraList', state.compraList);
-      _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
-    } catch(e) {
-      if (retries > 0) {
-        await new Promise(r => setTimeout(r, delay));
-        return attempt(retries - 1, Math.min(delay * 2, 8000));
-      }
-      // Sin mas reintentos: rollback del stock local al valor previo
-      if (p && prevStock !== null) {
-        p.stock = prevStock;
-        saveState();
-        renderAll();
-      }
-      setSyncState('error', 'Error');
-      toast('⚠️ Error de sync: no se pudo guardar en Sheets. Stock revertido.');
-      console.warn('Sheets useStock error (sin reintentos):', e.message);
-    }
-  };
-  await attempt(3, 1000);
-}
-
-// ── addStock atómico ─────────────────────────────────────────
-async function pushAddStock(productId, qty) {
-  if (!_sheetsUrl) return;
-  const p = state.products.find(x => x.id === productId);
-  const prevStock = p ? p.stock : null;
-
-  const attempt = async (retries, delay) => {
-    try {
-      const data = await sheetsPost({ action: 'addStock', id: productId, qty, device: DEVICE_ID });
-      if (p && data.stock !== undefined) {
-        p.stock = data.stock;
-        saveState();
-        renderAll();
-      }
-      // Sincronizar compraList (confirmAdd puede haber marcado items como done)
-      pushMeta('compraList', state.compraList);
-      _bcBroadcast({ type: 'STOCK_CHANGED', productId, stock: data.stock });
-    } catch(e) {
-      if (retries > 0) {
-        await new Promise(r => setTimeout(r, delay));
-        return attempt(retries - 1, Math.min(delay * 2, 8000));
-      }
-      if (p && prevStock !== null) {
-        p.stock = prevStock;
-        saveState();
-        renderAll();
-      }
-      setSyncState('error', 'Error');
-      toast('⚠️ Error de sync: no se pudo guardar en Sheets. Stock revertido.');
-      console.warn('Sheets addStock error (sin reintentos):', e.message);
-    }
-  };
-  await attempt(3, 1000);
-}
-
-// ── Operaciones de meta (compra, categorías, quickIds) ───────
-async function pushMeta(key, value) {
-  if (!_sheetsUrl) return;
-  try {
-    await sheetsPost({ action: 'setMeta', key, value, device: DEVICE_ID });
-  } catch(e) {
-    console.warn('Sheets setMeta error:', e.message);
-  }
-}
-
-// ── Añadir producto nuevo ────────────────────────────────────
-async function pushNewProduct(product) {
-  if (!_sheetsUrl) return;
-  try {
-    await sheetsPost({ action: 'addProduct', product, device: DEVICE_ID });
-    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('⚠️ Error al crear producto en Sheets: ' + e.message);
-  }
-}
-
-// ── Editar producto ──────────────────────────────────────────
-async function pushEditProduct(id, changes) {
-  if (!_sheetsUrl) return;
-  try {
-    await sheetsPost({ action: 'editProduct', id, changes, device: DEVICE_ID });
-    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('⚠️ Error al editar en Sheets: ' + e.message);
-  }
-}
-
-// ── Eliminar producto ────────────────────────────────────────
-async function pushDeleteProduct(id) {
-  if (!_sheetsUrl) return;
-  try {
-    await sheetsPost({ action: 'deleteProduct', id, device: DEVICE_ID });
-    _bcBroadcast({ type: 'PRODUCTS_CHANGED' });
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('⚠️ Error al eliminar en Sheets: ' + e.message);
-  }
-}
-
-// ── Migración inicial: sube inventario local a Sheets ────────
-async function migrateToSheets() {
-  if (!_sheetsUrl) { openSyncSetup(); return; }
-  if (!confirm('¿Subir el inventario local a Google Sheets? Esto creará todas las filas en la hoja.')) return;
-  setSyncState('syncing', 'Migrando...');
-  toast('🔄 Subiendo inventario a Sheets...');
-  try {
-    // Una sola llamada batch — evita el rate limit de Google Apps Script
-    await sheetsPost({
-      action: 'addAllProducts',
-      products: state.products,
-      categories: state.categories,
-      quickIds: state.quickIds,
-      compraList: state.compraList,
-      device: DEVICE_ID,
-    });
-    setSyncState('ok', 'Sheets');
-    toast('✅ Migración completa — ' + state.products.length + ' productos subidos');
-  } catch(e) {
-    setSyncState('error', 'Error');
-    toast('❌ Error en migración: ' + e.message);
-  }
-}
-
-// ── BroadcastChannel ─────────────────────────────────────────
-function _bcBroadcast(msg) {
-  try { if (_bc) _bc.postMessage(msg); } catch(e) {}
-}
-
-function _initBroadcastChannel() {
-  if (!('BroadcastChannel' in window)) return;
-  try {
-    if (_bc) _bc.close();
-    _bc = new BroadcastChannel(BC_CHANNEL_NAME);
-    _bc.onmessage = (e) => {
-      const msg = e.data;
-      if (!msg) return;
-      if (!_sheetsUrl) return;
-      if (msg.type === 'STOCK_CHANGED' && msg.productId) {
-        // Actualización rápida: solo ese producto
-        const p = state.products.find(x => x.id === msg.productId);
-        if (p && msg.stock !== undefined) {
-          p.stock = Number(msg.stock);
-          saveState();
-          renderAll();
-        }
-      } else if (msg.type === 'PRODUCTS_CHANGED') {
-        pullFromSheets();
-      }
-    };
-  } catch(e) {
-    _bc = null;
-  }
-}
-
-// ── Auto-pull + visibilityChange ─────────────────────────────
-let _visibilityListenerAdded = false;
-
-function startAutoSync() {
-  if (_syncTimer) clearInterval(_syncTimer);
-  if (!_sheetsUrl) return;
-  _initBroadcastChannel();
-  // Jitter de hasta 4s para evitar que varios dispositivos hagan
-  // poll exactamente al mismo tiempo y agoten la quota de GAS.
-  const jitter = Math.floor(Math.random() * 4000);
-  _syncTimer = setInterval(() => {
-    if (!document.hidden && !_syncing) pullFromSheets();
-  }, SYNC_INTERVAL_MS + jitter);
-  if (!_visibilityListenerAdded) {
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && _sheetsUrl) pullFromSheets();
-    });
-    _visibilityListenerAdded = true;
-  }
-}
-
-// ── Acciones manuales desde Ajustes ─────────────────────────
-async function forcePullFromSheets() {
-  if (!_sheetsUrl) { openSyncSetup(); return; }
-  if (!confirm('¿Obtener datos de Google Sheets? Los datos locales se actualizarán.')) return;
-  const ok = await pullFromSheets();
-  toast(ok ? '⬇️ Datos actualizados desde Sheets' : '❌ Error al obtener datos');
-}
-
 function openSyncSetup() {
   const inp = document.getElementById('sheetsUrlInput');
   if (inp && _sheetsUrl) inp.value = _sheetsUrl;
@@ -2516,127 +2300,110 @@ function openSyncSetup() {
   openModal('modalSync');
 }
 
-// ── initSync: parcha las operaciones de la app ───────────────
+// ── initSync: Hook original functions ────────────────────────
 function initSync() {
   loadSheetsCredentials();
+  if (!_sheetsUrl) return;
 
-  if (_sheetsUrl) {
-    // Detectar si este dispositivo es nuevo (sin datos locales guardados)
-    _isNewDevice = !localStorage.getItem('avancedental_v2');
+  _isNewDevice = !localStorage.getItem('avancedental_v2');
+  if (_isNewDevice) _showSyncOverlay('Conectando...', 'Obteniendo inventario por primera vez.');
 
-    if (_isNewDevice) {
-      // Dispositivo nuevo: mostrar overlay y ESPERAR al pull antes de permitir cualquier acción
-      _showSyncOverlay('Conectando con el inventario...');
-      // Timeout de 15s: si Sheets no responde, entra en modo advertencia (no silencioso)
-      const _overlayTimeout = setTimeout(() => {
-        _hideSyncOverlay();
-        _syncReady = true;
-        // Mostrar banner de advertencia — el dispositivo tiene datos INITIAL_PRODUCTS
-        // que NO son el inventario real. El usuario debe saber que hay problema.
-        _showNoSyncBanner('⚠️ No se pudo conectar con Sheets. Los datos mostrados pueden no estar actualizados.');
-        toast('⚠️ Timeout al conectar con Sheets. Revisa la conexión.');
-      }, 15000);
-      pullFromSheets().then(ok => {
-        clearTimeout(_overlayTimeout);
-        startAutoSync();
-        if (ok) {
-          _hideNoSyncBanner();
-          toast('✅ Inventario cargado desde Google Sheets');
-        } else {
-          _showNoSyncBanner('⚠️ Error al cargar desde Sheets. Reintentando...');
-        }
-      }).catch(() => {
-        clearTimeout(_overlayTimeout);
-        _hideSyncOverlay();
-        _syncReady = true;
-        _showNoSyncBanner('⚠️ Error al conectar con Sheets. Los datos pueden no estar actualizados.');
-        toast('⚠️ Error al conectar con Sheets. Revisa la URL en Ajustes.');
-      });
-    } else {
-      // Dispositivo conocido: tiene datos locales validos -> pull en background sin bloquear
-      _syncReady = true;
-      pullFromSheets().then(ok => {
-        startAutoSync();
-        if (ok) _hideNoSyncBanner();
-      });
-    }
-  } else {
-    // Sin Sheets configurado -> modo local explícito, banner ya visible desde loadSheetsCredentials
+  pullFromSheets().then(() => {
+    _hideSyncOverlay();
+    startAutoSync();
+  }).catch(() => {
+    _hideSyncOverlay();
     _syncReady = true;
-    // El banner _showNoSyncBanner() ya fue llamado en loadSheetsCredentials()
-  }
+  });
 
-  // ── confirmUse: descuenta atómicamente en Sheets ──────────
-  const origUse = window.confirmUse;
+  // Hooks: Usar window. para asegurar acceso global
   window.confirmUse = function() {
-    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
-    const id  = currentProductId;
+    const p = state.products.find(x => x.id === currentProductId);
+    if (!p) return;
     const qty = useQty;
-    origUse.call(this);              // actualiza local inmediatamente
-    pushUseStock(id, qty);           // luego sincroniza en background
+    p.stock = Math.max(0, p.stock - qty);
+    addToHistory('use', p, qty);
+    addToCompra(p, qty);
+    saveState();
+    closeModal('modalUse');
+    renderAll();
+    toast(`✅ −${qty} ${p.nombre}`);
+    pushUseStock(p.id, qty);
   };
 
-  // ── confirmAdd: añade stock atómicamente ──────────────────
-  const origAdd = window.confirmAdd;
   window.confirmAdd = function() {
-    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
-    const id  = currentProductId;
+    const p = state.products.find(x => x.id === currentProductId);
+    if (!p) return;
     const qty = addQty;
-    origAdd.call(this);
-    pushAddStock(id, qty);
+    p.stock += qty;
+    addToHistory('add', p, qty);
+    state.compraList.filter(c => c.productId === p.id && !c.done).forEach(c => {
+      if (p.stock > p.minimo) c.done = true;
+    });
+    saveState();
+    closeModal('modalAdd');
+    renderAll();
+    toast(`✅ +${qty} ${p.nombre}`);
+    pushAddStock(p.id, qty);
   };
 
-  // ── confirmEdit: edita producto ───────────────────────────
-  const origEdit = window.confirmEdit;
-  window.confirmEdit = function() {
-    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
-    const id      = parseInt(document.getElementById('editProdId').value);
-    const changes = {
-      nombre:    document.getElementById('editProdName').value.trim(),
-      stock:     parseInt(document.getElementById('editProdStock').value) || 0,
-      minimo:    parseInt(document.getElementById('editProdMin').value) || 2,
-      categoria: document.getElementById('editProdCat').value,
+  window.confirmNewProduct = function() {
+    const nombre = document.getElementById('newProdName').value.trim();
+    if (!nombre) { toast('⚠️ Escribe un nombre'); return; }
+    const prod = {
+      id: nextId(),
+      nombre: nombre.toLowerCase(),
+      stock: parseInt(document.getElementById('newProdStock').value) || 0,
+      minimo: parseInt(document.getElementById('newProdMin').value) || 2,
+      categoria: document.getElementById('newProdCat').value,
+      unidad: 'uds'
     };
-    origEdit.call(this);
+    state.products.push(prod);
+    saveState();
+    closeModal('modalNewProduct');
+    renderAll();
+    toast(`✅ Producto añadido: ${prod.nombre}`);
+    pushNewProduct(prod);
+  };
+
+  window.confirmEdit = function() {
+    const id = parseInt(document.getElementById('editProdId').value);
+    const p = state.products.find(x => x.id === id);
+    if (!p) return;
+    const changes = {
+      nombre: document.getElementById('editProdName').value.trim() || p.nombre,
+      stock: parseInt(document.getElementById('editProdStock').value) || 0,
+      minimo: parseInt(document.getElementById('editProdMin').value) || 2,
+      categoria: document.getElementById('editProdCat').value
+    };
+    Object.assign(p, changes);
+    saveState();
+    closeModal('modalEdit');
+    renderAll();
+    toast('✅ Producto actualizado');
     pushEditProduct(id, changes);
   };
 
-  // ── confirmNewProduct: añade producto ─────────────────────
-  const origNew = window.confirmNewProduct;
-  window.confirmNewProduct = function() {
-    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
-    const nombre = document.getElementById('newProdName').value.trim();
-    if (!nombre) return;
-    // Capturar el tamaño ANTES para saber el índice del nuevo producto
-    const prevLen = state.products.length;
-    origNew.call(this);
-    // El producto nuevo siempre se hace push() al array → es el último
-    if (state.products.length > prevLen) {
-      const p = state.products[state.products.length - 1];
-      pushNewProduct(p);
-    }
-  };
-
-  // ── deleteProduct: elimina producto ──────────────────────
-  const origDel = window.deleteProduct;
   window.deleteProduct = function() {
-    if (!_isSyncReady()) { toast('⏳ Espera — cargando inventario...'); return; }
     const id = parseInt(document.getElementById('editProdId').value);
-    origDel.call(this);
+    if (!confirm('¿Eliminar producto?')) return;
+    state.products = state.products.filter(x => x.id !== id);
+    state.quickIds = state.quickIds.filter(x => x !== id);
+    saveState();
+    closeModal('modalEdit');
+    renderAll();
+    toast('🗑 Producto eliminado');
     pushDeleteProduct(id);
   };
 
-  // ── toggleCompraItem + clearCompra: meta sync ─────────────
-  const origToggle = window.toggleCompraItem;
   window.toggleCompraItem = function(id) {
-    origToggle.call(this, id);
-    pushMeta('compraList', state.compraList);
+    const item = state.compraList.find(c => c.id === id);
+    if (item) { item.done = !item.done; saveState(); renderCompra(); pushMeta('compraList', state.compraList); }
   };
 
-  const origClear = window.clearCompra;
   window.clearCompra = function() {
-    origClear.call(this);
-    pushMeta('compraList', state.compraList);
+    state.compraList = state.compraList.filter(c => !c.done);
+    saveState(); renderCompra(); pushMeta('compraList', state.compraList);
   };
 }
 // ═══════════════════════════════════════
