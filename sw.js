@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-//  AVANCE DENTAL — Service Worker v3.1
+//  AVANCE DENTAL — Service Worker v3.3
 //  Estrategia: Cache-first para assets, Network-only para APIs
+//  Background Sync + Auto-update support
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'avancedental-v3.1';
+const CACHE_NAME = 'avancedental-v3.5';
 const ASSETS_TO_CACHE = [
   './',
   // index.html NO se cachea: el SW lo sirviría en lugar de la versión nueva
@@ -130,4 +131,33 @@ self.addEventListener('sync', event => {
       })
     );
   }
+});
+
+// ── Forzar actualización cuando el SW se instala ──────────────
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CHECK_UPDATE') {
+    // Notificar al cliente que hay una nueva versión disponible
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+    });
+  }
+});
+
+// ── Notificar al cliente cuando el SW toma control ────────────
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      )
+    ).then(() => self.clients.claim()).then(() => {
+      // Notificar a todos los clientes que el SW está activo
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
+      });
+    })
+  );
 });

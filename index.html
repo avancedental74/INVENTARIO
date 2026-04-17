@@ -643,6 +643,12 @@
   .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
   #syncStatus.syncing .sync-dot { animation: syncPulse 0.8s ease-in-out infinite; }
   @keyframes syncPulse { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+  .sync-pending-badge {
+    min-width: 16px; height: 16px; border-radius: 8px;
+    background: var(--red); color: #fff; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px; margin-left: 2px;
+  }
 
   /* ── SETUP MODAL ── */
   .setup-card {
@@ -693,6 +699,7 @@
       <div id="syncStatus" class="local" onclick="openSyncSetup()" title="Estado sincronización">
         <div class="sync-dot"></div>
         <span id="syncLabel">Local</span>
+        <span id="syncPendingBadge" class="sync-pending-badge" style="display:none">0</span>
       </div>
       <button class="icon-btn" onclick="openAddProduct()" title="Añadir producto">＋</button>
       <button class="icon-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Tema">🌙</button>
@@ -2039,15 +2046,16 @@ function setupDesktop() {
 
 
 // ═══════════════════════════════════════════════════════════════
-//  GOOGLE SHEETS SYNC LAYER v3.2  (parche MVF — 2025)
+//  GOOGLE SHEETS SYNC LAYER v3.3  (Sync Multi-Device — 2025)
 //  Backend: Google Apps Script Web App
-//  Modelo: Fuente de Verdad compartida con Handshake de ID
+//  Modelo: Merge inteligente + Cola offline + Background Sync
 // ═══════════════════════════════════════════════════════════════
 
 const HARDCODED_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzSmAyUIcPk4GRAQjM-ogNuzP7l06_yYPGGV9lX3q6YvmKzcaUQV9pO6tvbaXSwlS8naw/exec';
 const SHEETS_URL_KEY   = 'avancedental_sheets_url';
 const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
-const SYNC_INTERVAL_MS = 8000;
+const SYNC_INTERVAL_MS = 2500;  // Sincronización cada 2.5 segundos
+const PENDING_QUEUE_KEY = 'avancedental_pending_queue';
 const DEVICE_ID        = (() => {
   let id = localStorage.getItem('avancedental_device_id');
   if (!id) { id = 'dev_' + Math.random().toString(36).slice(2,8); localStorage.setItem('avancedental_device_id', id); }
@@ -2055,12 +2063,97 @@ const DEVICE_ID        = (() => {
 })();
 
 let _sheetsUrl   = '';
-let _syncTimer   = null;
-let _bc          = null;
-let _lastSyncTs  = 0;
-let _syncing     = false;
-let _syncReady   = false;
+let _syncTimer    = null;
+let _bc           = null;
+let _lastSyncTs   = 0;
+let _syncing      = false;
+let _syncReady    = false;
 let _syncPendingCount = 0;
+let _pendingQueue = [];
+
+// ── Cola de cambios offline ───────────────────────────────────
+function loadPendingQueue() {
+  try {
+    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
+    _pendingQueue = raw ? JSON.parse(raw) : [];
+  } catch(e) { _pendingQueue = []; }
+  updatePendingBadge();
+}
+
+function savePendingQueue() {
+  localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(_pendingQueue));
+  updatePendingBadge();
+}
+
+function updatePendingBadge() {
+  const badge = document.getElementById('syncPendingBadge');
+  if (!badge) return;
+  if (_pendingQueue.length > 0) {
+    badge.style.display = 'flex';
+    badge.textContent = _pendingQueue.length > 99 ? '99+' : _pendingQueue.length;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function addToPendingQueue(action, data) {
+  _pendingQueue.push({
+    action,
+    data,
+    ts: Date.now(),
+    attempts: 0
+  });
+  savePendingQueue();
+}
+
+async function processPendingQueue() {
+  if (!_sheetsUrl || _pendingQueue.length === 0) return;
+
+  const queue = [..._pendingQueue];
+  const successIds = [];
+
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i];
+    try {
+      let res;
+      switch (item.action) {
+        case 'useStock':
+          res = await sheetsPost({ action: 'useStock', id: item.data.id, qty: item.data.qty, clientStock: item.data.clientStock });
+          break;
+        case 'addStock':
+          res = await sheetsPost({ action: 'addStock', id: item.data.id, qty: item.data.qty });
+          break;
+        case 'addProduct':
+          res = await sheetsPost({ action: 'addProduct', product: item.data.product });
+          break;
+        case 'editProduct':
+          res = await sheetsPost({ action: 'editProduct', id: item.data.id, changes: item.data.changes });
+          break;
+        case 'deleteProduct':
+          res = await sheetsPost({ action: 'deleteProduct', id: item.data.id });
+          break;
+        case 'setMeta':
+          res = await sheetsPost({ action: 'setMeta', key: item.data.key, value: item.data.value });
+          break;
+        case 'mergeProducts':
+          res = await sheetsPost({ action: 'mergeProducts', products: item.data.products, categories: item.data.categories, quickIds: item.data.quickIds, compraList: item.data.compraList });
+          break;
+      }
+      if (res && res.ok) successIds.push(i);
+    } catch(e) {
+      console.warn('Pending queue item failed:', item.action, e.message);
+    }
+  }
+
+  // Remover items exitosos de la cola
+  if (successIds.length > 0) {
+    _pendingQueue = _pendingQueue.filter((_, idx) => !successIds.includes(idx));
+    savePendingQueue();
+    if (_pendingQueue.length === 0) {
+      toast('✅ Cambios pendientes sincronizados');
+    }
+  }
+}
 
 function _isSyncReady() { return !_sheetsUrl || _syncReady; }
 
@@ -2097,6 +2190,68 @@ function _showNoSyncBanner(msg, type = 'amber') {
 }
 
 function _hideNoSyncBanner() { document.getElementById('noSyncBanner')?.remove(); }
+
+// ── Notificación de conflictos de sincronización ──────────────
+function showConflictNotification(conflicts) {
+  if (conflicts.length === 0) return;
+
+  const existing = document.getElementById('conflictBanner');
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'conflictBanner';
+  banner.style.cssText = `
+    position: fixed; top: 12px; left: 12px; right: 12px;
+    background: var(--surface); border: 1px solid var(--amber);
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: var(--shadow-lg); z-index: 9998;
+    animation: slideDown 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height: 60vh; overflow-y: auto;
+  `;
+
+  const conflictList = conflicts.slice(0, 5).map(c => {
+    const newerLocal = c.localTs > c.serverTs;
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--text)">${c.nombre}</div>
+          <div style="font-size:11px;color:var(--text3)">
+            ${newerLocal ? 'Local' : 'Servidor'}: ${newerLocal ? c.localStock : c.serverStock} uds
+            ${newerLocal ? '' : `(antes: ${c.localStock})`}
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--amber)">⚠️</div>
+      </div>
+    `;
+  }).join('');
+
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:22px">⚠️</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">Conflicto de sincronización</div>
+        <div style="font-size:12px;color:var(--text2)">${conflicts.length} producto${conflicts.length>1?'s':''} modificado${conflicts.length>1?'s':''} en otro dispositivo</div>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);padding:8px;background:var(--surface2);border-radius:var(--radius-sm)">
+      <strong>Se conservó la versión más reciente.</strong>
+      ${conflicts.length > 5 ? `<br>Mostrando ${5} de ${conflicts.length} conflictos.` : ''}
+    </div>
+    <div>${conflictList}</div>
+    <button onclick="document.getElementById('conflictBanner').remove()" style="
+      width:100%;background:var(--amber);color:#fff;border:none;
+      border-radius:var(--radius-sm);padding:10px;font-family:var(--font);
+      font-size:13px;font-weight:600;cursor:pointer;
+    ">Entendido</button>
+  `;
+
+  document.body.appendChild(banner);
+
+  // Auto-ocultar después de 10 segundos
+  setTimeout(() => banner?.remove(), 10000);
+}
 
 function setSyncState(st, label) {
   const el = document.getElementById('syncStatus');
@@ -2149,7 +2304,72 @@ async function pullFromSheets() {
     const data = await sheetsCall({ action: 'getAll' });
     if (data.products) {
       if (data.products.length > 0) {
-        state.products = data.products;
+        // ── MERGE INTELIGENTE: comparar updatedAt ───────────────────
+        const serverProducts = data.products;
+        const localProducts = state.products || [];
+        const mergedProducts = [];
+        const conflicts = [];
+        const localMap = new Map(localProducts.map(p => [p.id, p]));
+        const serverMap = new Map(serverProducts.map(p => [p.id, p]));
+        const allIds = new Set([...localMap.keys(), ...serverMap.keys()]);
+
+        allIds.forEach(id => {
+          const local = localMap.get(id);
+          const server = serverMap.get(id);
+
+          if (!server && local) {
+            // Solo existe localmente → si tiene updatedAt reciente, agregarlo
+            if (local.updatedAt && local.updatedAt > 0) {
+              mergedProducts.push(local);
+            }
+          } else if (!local && server) {
+            // Solo existe en servidor → agregarlo
+            mergedProducts.push(server);
+          } else if (local && server) {
+            // Existe en ambos → usar el más reciente
+            const localTs = local.updatedAt || 0;
+            const serverTs = server.updatedAt || 0;
+
+            // Detectar conflicto: ambos modificados y stock diferente
+            if (localTs > 0 && serverTs > 0 && localTs !== serverTs && local.stock !== server.stock) {
+              conflicts.push({
+                id,
+                nombre: local.nombre || server.nombre,
+                localStock: local.stock,
+                serverStock: server.stock,
+                localTs,
+                serverTs
+              });
+            }
+
+            mergedProducts.push(serverTs >= localTs ? server : local);
+          }
+        });
+
+        // Ordenar por ID
+        mergedProducts.sort((a, b) => a.id - b.id);
+
+        // Detectar productos nuevos locales que no están en servidor
+        const newLocalProducts = localProducts.filter(p =>
+          !serverMap.has(p.id) && p.updatedAt && p.updatedAt > (_lastSyncTs || 0)
+        );
+
+        if (newLocalProducts.length > 0) {
+          // Enviar productos locales nuevos al servidor
+          try {
+            await sheetsPost({
+              action: 'mergeProducts',
+              products: newLocalProducts,
+              categories: state.categories,
+              quickIds: state.quickIds,
+              compraList: state.compraList
+            });
+          } catch(e) {
+            console.warn('Error merging new local products:', e);
+          }
+        }
+
+        state.products = mergedProducts;
         state.categories = (data.categories && data.categories.length) ? data.categories : state.categories;
         state.quickIds = (data.quickIds && data.quickIds.length) ? data.quickIds : state.quickIds;
         state.compraList = data.compraList || [];
@@ -2157,6 +2377,14 @@ async function pullFromSheets() {
         saveState(); renderAll();
         _syncReady = true; _hideSyncOverlay(); _hideNoSyncBanner();
         setSyncState('ok', 'Sheets');
+
+        // ── Notificar conflictos detectados ─────────────────────────
+        if (conflicts.length > 0) {
+          showConflictNotification(conflicts);
+        }
+
+        // Procesar cola de cambios pendientes después del pull
+        await processPendingQueue();
       } else {
         _syncReady = true; _hideNoSyncBanner();
         const isActuallyNew = !localStorage.getItem('avancedental_v2');
@@ -2173,16 +2401,56 @@ async function pullFromSheets() {
 }
 
 async function initSync() {
+  // Cargar cola de cambios pendientes
+  loadPendingQueue();
+
   loadSheetsCredentials();
-  if (!_sheetsUrl) return;
+  if (!_sheetsUrl) {
+    // Sin URL de sync → mostrar banner de modo local
+    _showNoSyncBanner('<b>Modo Local Activo:</b> No hay conexión con el servidor.');
+    return;
+  }
+
   const isNew = !localStorage.getItem('avancedental_v2');
   if (isNew) _showSyncOverlay('Conectando...', 'Sincronizando inventario por primera vez.');
+
   try {
     await pullFromSheets();
+    // Si hay conexión y cola pendiente, procesarla
+    if (navigator.onLine && _pendingQueue.length > 0) {
+      await processPendingQueue();
+    }
   } catch(e) { console.error('InitSync failed:', e); }
+
   _hideSyncOverlay();
   startAutoSync();
   _initBroadcastChannel();
+
+  // ── Listener para cuando vuelve la conexión ───────────────
+  window.addEventListener('online', async () => {
+    console.log('Conexión recuperada - procesando cola pendiente');
+    setSyncState('syncing', 'Sync...');
+    try {
+      await pullFromSheets();
+      if (_pendingQueue.length > 0) {
+        toast('🔄 Sincronizando cambios pendientes...');
+        await processPendingQueue();
+      }
+    } catch(e) {
+      console.warn('Error en reconexión:', e);
+    }
+  });
+
+  // ── Registrar Background Sync si está disponible ───────────
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    navigator.serviceWorker.ready.then(reg => {
+      if (_pendingQueue.length > 0) {
+        reg.sync.register('sync-inventory').catch(e =>
+          console.warn('Background sync registration failed:', e)
+        );
+      }
+    });
+  }
 }
 
 function startAutoSync() {
@@ -2203,19 +2471,34 @@ function _initBroadcastChannel() {
 function _notifyRefresh() { _bc?.postMessage({ type: 'REFRESH', sender: DEVICE_ID }); }
 
 async function pushUseStock(id, qty) {
-  if (!_sheetsUrl) return;
+  if (!_sheetsUrl) {
+    // Sin conexión → agregar a cola pendiente
+    const p = state.products.find(x => x.id === id);
+    if (p) {
+      addToPendingQueue('useStock', { id, qty, clientStock: p.stock + qty });
+      toast('📤 Cambio guardado (sin conexión)');
+    }
+    return;
+  }
   const p = state.products.find(x => x.id === id);
   if (!p) return;
   _syncPendingCount++;
   try {
     const res = await sheetsPost({ action: 'useStock', id, qty, clientStock: p.stock + qty });
     if (res.ok) { p.stock = res.stock; saveState(); renderAll(); _notifyRefresh(); }
-  } catch(e) { toast('⚠️ Error de sync'); }
+  } catch(e) {
+    toast('⚠️ Sin conexión - cambio guardado localmente');
+    addToPendingQueue('useStock', { id, qty, clientStock: p.stock + qty });
+  }
   finally { _syncPendingCount--; }
 }
 
 async function pushAddStock(id, qty) {
-  if (!_sheetsUrl) return;
+  if (!_sheetsUrl) {
+    addToPendingQueue('addStock', { id, qty });
+    toast('📤 Cambio guardado (sin conexión)');
+    return;
+  }
   _syncPendingCount++;
   try {
     const res = await sheetsPost({ action: 'addStock', id, qty });
@@ -2223,12 +2506,19 @@ async function pushAddStock(id, qty) {
        const p = state.products.find(x => x.id === id);
        if (p) { p.stock = res.stock; saveState(); renderAll(); _notifyRefresh(); }
     }
-  } catch(e) { toast('⚠️ Error de sync Add'); }
+  } catch(e) {
+    toast('⚠️ Sin conexión - cambio guardado localmente');
+    addToPendingQueue('addStock', { id, qty });
+  }
   finally { _syncPendingCount--; }
 }
 
 async function pushNewProduct(localProd) {
-  if (!_sheetsUrl) return;
+  if (!_sheetsUrl) {
+    addToPendingQueue('addProduct', { product: localProd });
+    toast('📤 Producto guardado (sin conexión)');
+    return;
+  }
   _syncPendingCount++;
   try {
     const res = await sheetsPost({ action: 'addProduct', product: localProd });
@@ -2236,22 +2526,48 @@ async function pushNewProduct(localProd) {
       const idx = state.products.findIndex(p => p.id === localProd.id);
       if (idx !== -1) { state.products[idx].id = res.id; saveState(); renderAll(); _notifyRefresh(); }
     }
-  } finally { _syncPendingCount--; }
+  } catch(e) {
+    addToPendingQueue('addProduct', { product: localProd });
+  }
+  finally { _syncPendingCount--; }
 }
 
 async function pushEditProduct(id, changes) {
-  if (!_sheetsUrl) return;
-  try { await sheetsPost({ action: 'editProduct', id, changes }); _notifyRefresh(); } catch(e){}
+  if (!_sheetsUrl) {
+    addToPendingQueue('editProduct', { id, changes });
+    return;
+  }
+  try {
+    await sheetsPost({ action: 'editProduct', id, changes });
+    _notifyRefresh();
+  } catch(e) {
+    addToPendingQueue('editProduct', { id, changes });
+  }
 }
 
 async function pushDeleteProduct(id) {
-  if (!_sheetsUrl) return;
-  try { await sheetsPost({ action: 'deleteProduct', id }); _notifyRefresh(); } catch(e){}
+  if (!_sheetsUrl) {
+    addToPendingQueue('deleteProduct', { id });
+    return;
+  }
+  try {
+    await sheetsPost({ action: 'deleteProduct', id });
+    _notifyRefresh();
+  } catch(e) {
+    addToPendingQueue('deleteProduct', { id });
+  }
 }
 
 async function pushMeta(key, value) {
-  if (!_sheetsUrl) return;
-  try { await sheetsPost({ action: 'setMeta', key, value }); } catch(e){}
+  if (!_sheetsUrl) {
+    addToPendingQueue('setMeta', { key, value });
+    return;
+  }
+  try {
+    await sheetsPost({ action: 'setMeta', key, value });
+  } catch(e) {
+    addToPendingQueue('setMeta', { key, value });
+  }
 }
 
 // ── Sync Helpers ───────────────────────────────────────────
@@ -2458,13 +2774,41 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !location.
     navigator.serviceWorker.register('./sw.js')
       .then(reg => {
         console.log('SW registrado:', reg.scope);
+
+        // Verificar si hay actualizaciones del SW
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Hay una nueva versión disponible
+                showUpdateBanner(APP_VERSION + '+');
+              }
+            });
+          }
+        });
+
+        // Listener para mensajes del Service Worker
         navigator.serviceWorker.addEventListener('message', e => {
           if (e.data && e.data.type === 'SYNC_NOW' && _sheetsUrl) {
             pullFromSheets();
           }
+          if (e.data && e.data.type === 'SW_ACTIVATED') {
+            console.log('SW activado - verificando actualizaciones');
+            checkForUpdate();
+          }
+          if (e.data && e.data.type === 'UPDATE_AVAILABLE') {
+            showUpdateBanner(APP_VERSION + '+');
+          }
         });
       })
       .catch(err => console.warn('SW error:', err));
+
+  // Verificar actualización del SW cuando vuelve la conexión
+  window.addEventListener('online', () => {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg) reg.update();
+    });
   });
 }
 
@@ -2569,7 +2913,7 @@ window.addEventListener('load', checkIOSInstall);
 // ═══════════════════════════════════════
 
 // ── VERSIÓN DE LA APP — incrementa este número cada vez que subas cambios a GitHub ──
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.5';
 
 async function checkForUpdate() {
   try {
@@ -2642,8 +2986,13 @@ if (!document.getElementById('updateBannerStyle')) {
   document.head.appendChild(style);
 }
 
-// Comprueba actualización solo al iniciar la app (10s después de cargar)
-window.addEventListener('load', () => setTimeout(checkForUpdate, 10000));
+// Comprueba actualización al iniciar la app y cada 5 minutos
+window.addEventListener('load', () => {
+  // Verificar inmediatamente (después de que la app cargue)
+  setTimeout(checkForUpdate, 2000);
+  // Y también cada 5 minutos mientras la app está abierta
+  setInterval(checkForUpdate, 300000);
+});
 
 </script>
 </body>

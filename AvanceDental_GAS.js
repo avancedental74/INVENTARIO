@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  AVANCE DENTAL — Google Apps Script Backend  v3.2
-//  Compatible con index.html v3.2 (parche MVF — Resolución Sincronización)
+//  AVANCE DENTAL — Google Apps Script Backend  v3.3
+//  Compatible con index.html v3.3 (Sync Multi-Device)
 // ═══════════════════════════════════════════════════════════════
 
 const SHEET_INVENTORY = 'Inventario';
 const SHEET_META      = 'Meta';
-const GAS_VERSION     = '3.2';
+const GAS_VERSION     = '3.3';
 
 // Columnas de la hoja Inventario (base 1)
 const COL_ID         = 1;
@@ -191,10 +191,14 @@ function handleMergeProducts(body) {
       ];
 
       if (row) {
-        // Solo actualizar si el entrante es más reciente o si el stock es diferente (Merge simple)
-        // Para seguridad, simplemente actualizamos la fila si existe
-        sheet.getRange(row, 1, 1, 6).setValues([rowData]);
-        updatedCount++;
+        const currentUpdatedAt = Number(sheet.getRange(row, COL_UPDATED_AT).getValue() || 0);
+        const incomingUpdatedAt = Number(p.updatedAt || 0);
+
+        // REGLA DE ORO: Solo sobreescribimos si el dato que llega es MÁS RECIENTE
+        if (incomingUpdatedAt > currentUpdatedAt) {
+          sheet.getRange(row, 1, 1, 6).setValues([rowData]);
+          updatedCount++;
+        }
       } else {
         sheet.appendRow(rowData);
         addedCount++;
