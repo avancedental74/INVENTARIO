@@ -33,16 +33,19 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// ── Activate: limpiar caches antiguos ───────────────────────
+// ── Activate: limpiar caches antiguos + notificar clientes ──────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
       )
-    )
+    ).then(() => self.clients.claim()).then(() => {
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
+      });
+    })
   );
-  self.clients.claim();
 });
 
 // ── Fetch: estrategia según tipo de request ──────────────────
@@ -146,18 +149,4 @@ self.addEventListener('message', event => {
   }
 });
 
-// ── Notificar al cliente cuando el SW toma control ────────────
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim()).then(() => {
-      // Notificar a todos los clientes que el SW está activo
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'SW_ACTIVATED' }));
-      });
-    })
-  );
-});
+// ── Notificar al cliente cuando el SW toma control ── (activate único — ver arriba)

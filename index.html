@@ -920,7 +920,7 @@
       </div>
 
       <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:12px">
-        Avance Dental Inventario v3.1 · Google Sheets Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
+        Avance Dental Inventario v3.5 · Google Sheets Sync<br>222 productos · <span id="syncFooter">Datos locales</span>
       </div>
     </div>
 
@@ -1605,14 +1605,16 @@ function changeUseQty(delta) {
 function confirmUse() {
   const p = state.products.find(x => x.id === currentProductId);
   if (!p) return;
+  const stockAntes = p.stock; // capturar ANTES del descuento — necesario para clientStock
   p.stock = Math.max(0, p.stock - useQty);
+  p.updatedAt = Date.now();
   addToHistory('use', p, useQty);
   addToCompra(p, useQty);
   saveState();
   closeModal('modalUse');
   renderAll();
   toast(`✅ −${useQty} ${p.nombre}`);
-  if (_sheetsUrl) pushUseStock(p.id, useQty);
+  pushUseStock(p.id, useQty, stockAntes); // pasa stock pre-descuento como clientStock
 }
 
 // ═══════════════════════════════════════
@@ -1637,16 +1639,18 @@ function confirmAdd() {
   const p = state.products.find(x => x.id === currentProductId);
   if (!p) return;
   p.stock += addQty;
+  p.updatedAt = Date.now();
   addToHistory('add', p, addQty);
-  // Mark compra as done if enough stock
+  let compraChanged = false;
   state.compraList.filter(c => c.productId === p.id && !c.done).forEach(c => {
-    if (p.stock > p.minimo) c.done = true;
+    if (p.stock > p.minimo) { c.done = true; compraChanged = true; }
   });
   saveState();
   closeModal('modalAdd');
   renderAll();
   toast(`✅ +${addQty} ${p.nombre} · Stock: ${p.stock}`);
-  if (_sheetsUrl) pushAddStock(p.id, addQty);
+  pushAddStock(p.id, addQty);
+  if (compraChanged) pushMeta('compraList', state.compraList);
 }
 
 // ═══════════════════════════════════════
@@ -1670,14 +1674,15 @@ function confirmNewProduct() {
     stock: parseInt(document.getElementById('newProdStock').value) || 0,
     minimo: parseInt(document.getElementById('newProdMin').value) || 2,
     categoria: document.getElementById('newProdCat').value,
-    unidad: 'uds'
+    unidad: 'uds',
+    updatedAt: Date.now(), // ← FIX: necesario para merge inteligente
   };
   state.products.push(prod);
   saveState();
   closeModal('modalNewProduct');
   renderAll();
   toast(`✅ Producto añadido: ${prod.nombre}`);
-  if (_sheetsUrl) pushNewProduct(prod);
+  pushNewProduct(prod); // gestiona cola offline internamente
 }
 
 // ═══════════════════════════════════════
@@ -1697,18 +1702,20 @@ function openEditModal(id) {
 function confirmEdit() {
   const id = parseInt(document.getElementById('editProdId').value);
   const p = state.products.find(x => x.id === id);
+  if (!p) return;
   const changes = {
     nombre: document.getElementById('editProdName').value.trim() || p.nombre,
     stock: parseInt(document.getElementById('editProdStock').value) || 0,
     minimo: parseInt(document.getElementById('editProdMin').value) || 2,
-    categoria: document.getElementById('editProdCat').value
+    categoria: document.getElementById('editProdCat').value,
+    updatedAt: Date.now(), // ← FIX: necesario para merge inteligente
   };
   Object.assign(p, changes);
   saveState();
   closeModal('modalEdit');
   renderAll();
   toast('✅ Producto actualizado');
-  if (_sheetsUrl) sheetsPost({ action: 'editProduct', id: p.id, changes });
+  pushEditProduct(id, changes); // gestiona cola offline internamente
 }
 function deleteProduct() {
   const id = parseInt(document.getElementById('editProdId').value);
@@ -1719,7 +1726,7 @@ function deleteProduct() {
   closeModal('modalEdit');
   renderAll();
   toast('🗑 Producto eliminado');
-  if (_sheetsUrl) sheetsPost({ action: 'deleteProduct', id });
+  pushDeleteProduct(id); // gestiona cola offline internamente
 }
 
 // ═══════════════════════════════════════
@@ -1791,12 +1798,12 @@ function addToCompraManual(id) {
 
 function toggleCompraItem(id) {
   const item = state.compraList.find(c => c.id === id);
-  if (item) { item.done = !item.done; saveState(); renderCompra(); }
+  if (item) { item.done = !item.done; saveState(); renderCompra(); pushMeta('compraList', state.compraList); }
 }
 function clearCompra() {
   if (!confirm('¿Eliminar los ítems completados?')) return;
   state.compraList = state.compraList.filter(c => !c.done);
-  saveState(); renderCompra();
+  saveState(); renderCompra(); pushMeta('compraList', state.compraList);
   toast('🗑 Completados eliminados');
 }
 function exportCompra() {
@@ -2054,7 +2061,7 @@ function setupDesktop() {
 const HARDCODED_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzSmAyUIcPk4GRAQjM-ogNuzP7l06_yYPGGV9lX3q6YvmKzcaUQV9pO6tvbaXSwlS8naw/exec';
 const SHEETS_URL_KEY   = 'avancedental_sheets_url';
 const BC_CHANNEL_NAME  = 'avancedental_sync_v3';
-const SYNC_INTERVAL_MS = 2500;  // Sincronización cada 2.5 segundos
+const SYNC_INTERVAL_MS = 30000;  // Sincronización cada 30 segundos (era 2.5s → agotaba quota GAS)
 const PENDING_QUEUE_KEY = 'avancedental_pending_queue';
 const DEVICE_ID        = (() => {
   let id = localStorage.getItem('avancedental_device_id');
@@ -2470,25 +2477,28 @@ function _initBroadcastChannel() {
 
 function _notifyRefresh() { _bc?.postMessage({ type: 'REFRESH', sender: DEVICE_ID }); }
 
-async function pushUseStock(id, qty) {
-  if (!_sheetsUrl) {
-    // Sin conexión → agregar a cola pendiente
+async function pushUseStock(id, qty, stockAntes) {
+  // stockAntes = stock ANTES del descuento local → es el clientStock correcto para el servidor
+  const clientStock = stockAntes !== undefined ? stockAntes : (() => {
     const p = state.products.find(x => x.id === id);
-    if (p) {
-      addToPendingQueue('useStock', { id, qty, clientStock: p.stock + qty });
-      toast('📤 Cambio guardado (sin conexión)');
-    }
+    return p ? p.stock + qty : qty; // fallback: stock actual + qty descontado
+  })();
+
+  if (!_sheetsUrl) {
+    addToPendingQueue('useStock', { id, qty, clientStock });
+    toast('📤 Cambio guardado (sin conexión)');
     return;
   }
-  const p = state.products.find(x => x.id === id);
-  if (!p) return;
   _syncPendingCount++;
   try {
-    const res = await sheetsPost({ action: 'useStock', id, qty, clientStock: p.stock + qty });
-    if (res.ok) { p.stock = res.stock; saveState(); renderAll(); _notifyRefresh(); }
+    const res = await sheetsPost({ action: 'useStock', id, qty, clientStock });
+    if (res.ok) {
+      const p = state.products.find(x => x.id === id);
+      if (p) { p.stock = res.stock; p.updatedAt = res.updatedAt || Date.now(); saveState(); renderAll(); _notifyRefresh(); }
+    }
   } catch(e) {
     toast('⚠️ Sin conexión - cambio guardado localmente');
-    addToPendingQueue('useStock', { id, qty, clientStock: p.stock + qty });
+    addToPendingQueue('useStock', { id, qty, clientStock });
   }
   finally { _syncPendingCount--; }
 }
@@ -2645,112 +2655,7 @@ function openSyncSetup() {
   openModal('modalSync');
 }
 
-// ── initSync: Hook original functions ────────────────────────
-function initSync() {
-  loadSheetsCredentials();
-  if (!_sheetsUrl) return;
-
-  _isNewDevice = !localStorage.getItem('avancedental_v2');
-  if (_isNewDevice) _showSyncOverlay('Conectando...', 'Obteniendo inventario por primera vez.');
-
-  pullFromSheets().then(() => {
-    _hideSyncOverlay();
-    startAutoSync();
-  }).catch(() => {
-    _hideSyncOverlay();
-    _syncReady = true;
-  });
-
-  // Hooks: Usar window. para asegurar acceso global
-  window.confirmUse = function() {
-    const p = state.products.find(x => x.id === currentProductId);
-    if (!p) return;
-    const qty = useQty;
-    p.stock = Math.max(0, p.stock - qty);
-    addToHistory('use', p, qty);
-    addToCompra(p, qty);
-    saveState();
-    closeModal('modalUse');
-    renderAll();
-    toast(`✅ −${qty} ${p.nombre}`);
-    pushUseStock(p.id, qty);
-  };
-
-  window.confirmAdd = function() {
-    const p = state.products.find(x => x.id === currentProductId);
-    if (!p) return;
-    const qty = addQty;
-    p.stock += qty;
-    addToHistory('add', p, qty);
-    state.compraList.filter(c => c.productId === p.id && !c.done).forEach(c => {
-      if (p.stock > p.minimo) c.done = true;
-    });
-    saveState();
-    closeModal('modalAdd');
-    renderAll();
-    toast(`✅ +${qty} ${p.nombre}`);
-    pushAddStock(p.id, qty);
-  };
-
-  window.confirmNewProduct = function() {
-    const nombre = document.getElementById('newProdName').value.trim();
-    if (!nombre) { toast('⚠️ Escribe un nombre'); return; }
-    const prod = {
-      id: nextId(),
-      nombre: nombre.toLowerCase(),
-      stock: parseInt(document.getElementById('newProdStock').value) || 0,
-      minimo: parseInt(document.getElementById('newProdMin').value) || 2,
-      categoria: document.getElementById('newProdCat').value,
-      unidad: 'uds'
-    };
-    state.products.push(prod);
-    saveState();
-    closeModal('modalNewProduct');
-    renderAll();
-    toast(`✅ Producto añadido: ${prod.nombre}`);
-    pushNewProduct(prod);
-  };
-
-  window.confirmEdit = function() {
-    const id = parseInt(document.getElementById('editProdId').value);
-    const p = state.products.find(x => x.id === id);
-    if (!p) return;
-    const changes = {
-      nombre: document.getElementById('editProdName').value.trim() || p.nombre,
-      stock: parseInt(document.getElementById('editProdStock').value) || 0,
-      minimo: parseInt(document.getElementById('editProdMin').value) || 2,
-      categoria: document.getElementById('editProdCat').value
-    };
-    Object.assign(p, changes);
-    saveState();
-    closeModal('modalEdit');
-    renderAll();
-    toast('✅ Producto actualizado');
-    pushEditProduct(id, changes);
-  };
-
-  window.deleteProduct = function() {
-    const id = parseInt(document.getElementById('editProdId').value);
-    if (!confirm('¿Eliminar producto?')) return;
-    state.products = state.products.filter(x => x.id !== id);
-    state.quickIds = state.quickIds.filter(x => x !== id);
-    saveState();
-    closeModal('modalEdit');
-    renderAll();
-    toast('🗑 Producto eliminado');
-    pushDeleteProduct(id);
-  };
-
-  window.toggleCompraItem = function(id) {
-    const item = state.compraList.find(c => c.id === id);
-    if (item) { item.done = !item.done; saveState(); renderCompra(); pushMeta('compraList', state.compraList); }
-  };
-
-  window.clearCompra = function() {
-    state.compraList = state.compraList.filter(c => !c.done);
-    saveState(); renderCompra(); pushMeta('compraList', state.compraList);
-  };
-}
+// ── (segunda initSync eliminada — era duplicado que sobreescribía la versión async correcta) ──
 // ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
@@ -2810,6 +2715,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !location.
       if (reg) reg.update();
     });
   });
+  }); // ← cierre de window.addEventListener('load', ...)
 }
 
 // Banner de instalación PWA
